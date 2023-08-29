@@ -3,6 +3,11 @@
 #include <vulkan/vulkan.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <array>
+#include <vector>
+#include <iostream>
+
+#include "BinaryUtil.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;
@@ -65,26 +70,33 @@ VkShaderModule createShaderModule(VkDevice device, const char* filePath) {
 class ComputeShaderApp {
 public:
     void run() {
-        initWindow();
+
+        size_t numElements = 10;
+
+        //initWindow();
         m_instance = createInstance();
         pickPhysicalDevice();
         createLogicalDevice();
         createDescriptorSetLayout();
+        createDescriptorPool();
+        createDataBuffers(numElements);
         createComputePipeline();
         createCommandBuffer();
 
-        while (!glfwWindowShouldClose(m_window)) {
-            glfwPollEvents();
-            runComputeShader(1, 1, 1);
-        }
+        //while (!glfwWindowShouldClose(m_window)) {
+        //    glfwPollEvents();
+        //}
+        printDataBuffers(numElements);
+        runComputeShader(numElements, 1, 1);
+        printDataBuffers(numElements);
 
         vkDestroyPipeline(m_device, m_computePipeline, NULL);
         vkDestroyPipelineLayout(m_device, m_pipelineLayout, NULL);
         vkDestroyCommandPool(m_device, m_commandPool, NULL);
         vkDestroyDevice(m_device, NULL);
         vkDestroyInstance(m_instance, NULL);
-        glfwDestroyWindow(m_window);
-        glfwTerminate();
+        //glfwDestroyWindow(m_window);
+        //glfwTerminate();
     }
 
 private:
@@ -142,32 +154,6 @@ private:
         vkGetDeviceQueue(vkDevice, 0, 0, &m_computeQueue); // Queue family index 0, queue index 0
 
         m_device = vkDevice;
-    }
-
-    void createDescriptorSetLayout() {
-        VkDescriptorSetLayoutBinding inputBinding = {};
-        inputBinding.binding = 0;
-        inputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        inputBinding.descriptorCount = 1;
-        inputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        VkDescriptorSetLayoutBinding outputBinding = {};
-        outputBinding.binding = 1;
-        outputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        outputBinding.descriptorCount = 1;
-        outputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-        VkDescriptorSetLayoutBinding bindings[] = {inputBinding, outputBinding};
-
-        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
-        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-        layoutInfo.bindingCount = 2; // Number of bindings
-        layoutInfo.pBindings = bindings;
-
-        if (vkCreateDescriptorSetLayout(m_device, &layoutInfo, NULL, &m_descriptorSetLayout) != VK_SUCCESS) {
-            fprintf(stderr, "Failed to create descriptor set layout!\n");
-            exit(EXIT_FAILURE);
-        }
     }
 
     void createComputePipeline() {
@@ -234,8 +220,8 @@ private:
         // Bind the compute pipeline
         vkCmdBindPipeline(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_computePipeline);
 
-        // Bind descriptor sets if needed
-        // ...
+        // Bind descriptor sets
+        vkCmdBindDescriptorSets(m_commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_pipelineLayout, 0, 1, &m_descriptorSet, 0, nullptr);
 
         // Dispatch the compute shader
         vkCmdDispatch(m_commandBuffer, numGroupsX, numGroupsY, numGroupsZ);
@@ -255,65 +241,197 @@ private:
         vkQueueWaitIdle(m_computeQueue); // Wait for the compute queue to finish
     }
 
+    void createDescriptorSetLayout() {
+        VkDescriptorSetLayoutBinding inputBinding = {};
+        inputBinding.binding = 0;
+        inputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        inputBinding.descriptorCount = 1;
+        inputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding outputBinding = {};
+        outputBinding.binding = 1;
+        outputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        outputBinding.descriptorCount = 1;
+        outputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+        VkDescriptorSetLayoutBinding bindings[] = {inputBinding, outputBinding};
+
+        VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+        layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+        layoutInfo.bindingCount = 2; // Number of bindings
+        layoutInfo.pBindings = bindings;
+
+        if (vkCreateDescriptorSetLayout(m_device, &layoutInfo, NULL, &m_descriptorSetLayout) != VK_SUCCESS) {
+            fprintf(stderr, "Failed to create descriptor set layout!\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    void createDescriptorPool() {
+        std::array<VkDescriptorPoolSize, 1> poolSizes{};
+        poolSizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+        poolSizes[0].descriptorCount = static_cast<uint32_t>(2);
+
+        VkDescriptorPoolCreateInfo poolInfo{};
+        poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+        poolInfo.poolSizeCount = 1;
+        poolInfo.pPoolSizes = poolSizes.data();
+        poolInfo.maxSets = static_cast<uint32_t>(2);
+
+        if (vkCreateDescriptorPool(m_device, &poolInfo, nullptr, &m_descriptorPool) != VK_SUCCESS) {
+            fprintf(stderr, "failed to create descriptor pool!\n");
+            exit(EXIT_FAILURE);
+        }
+    }
+
+    void printDataBuffers(size_t numElements) {
+        VkDeviceSize bufferSize = sizeof(int) * numElements;
+        
+        // Map and fill the buffers
+        void* inputDataPtr;
+        void* outputDataPtr;
+
+        vkMapMemory(m_device, m_inputBufferMemory, 0, bufferSize, 0, &inputDataPtr);
+        vkMapMemory(m_device, m_outputBufferMemory, 0, bufferSize, 0, &outputDataPtr);
+
+        // Print inputDataPtr and outputDataPtr
+        std::cout << "Input buffer:" << std::endl;
+        printBufferBinaryXxd((const char*)inputDataPtr, bufferSize);
+
+        std::cout << "Output buffer:" << std::endl;
+        printBufferBinaryXxd((const char*)outputDataPtr, bufferSize);
+
+
+        vkUnmapMemory(m_device, m_inputBufferMemory);
+        vkUnmapMemory(m_device, m_outputBufferMemory);
+    }
+
+    void createDataBuffers(size_t numElements) {
+        // Create input and output buffers
+
+        VkDeviceSize bufferSize = sizeof(int) * numElements;
+
+        createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_inputBuffer, m_inputBufferMemory);
+        createBuffer(bufferSize, VK_BUFFER_USAGE_STORAGE_BUFFER_BIT, VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT, m_outputBuffer, m_outputBufferMemory);
+
+        // Map and fill the buffers
+        void* inputDataPtr;
+        void* outputDataPtr;
+
+        vkMapMemory(m_device, m_inputBufferMemory, 0, bufferSize, 0, &inputDataPtr);
+        vkMapMemory(m_device, m_outputBufferMemory, 0, bufferSize, 0, &outputDataPtr);
+
+        // Fill inputDataPtr with 1, 2, 3, 4, ...
+        int* inputIntDataPtr = (int*)inputDataPtr;
+        for (size_t i = 0; i < numElements; i++) {
+            inputIntDataPtr[i] = i + 1;
+        }
+
+
+        vkUnmapMemory(m_device, m_inputBufferMemory);
+        vkUnmapMemory(m_device, m_outputBufferMemory);
+
+        // Create descriptor set
+        VkDescriptorSetAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        allocInfo.descriptorPool = m_descriptorPool;
+        allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
+        allocInfo.pSetLayouts = &m_descriptorSetLayout;
+        if (vkAllocateDescriptorSets(m_device, &allocInfo, &m_descriptorSet) != VK_SUCCESS) {
+            fprintf(stderr, "failed to allocate descriptor sets!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        // Update descriptor sets
+        std::array<VkWriteDescriptorSet, 2> descriptorWrites{};
+
+        VkDescriptorBufferInfo inputBufferInfo = {};
+        inputBufferInfo.buffer = m_inputBuffer;
+        inputBufferInfo.offset = 0;
+        inputBufferInfo.range = bufferSize;
+
+        descriptorWrites[0].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[0].dstSet = m_descriptorSet;
+        descriptorWrites[0].dstBinding = 0;
+        descriptorWrites[0].dstArrayElement = 0;
+        descriptorWrites[0].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[0].descriptorCount = 1;
+        descriptorWrites[0].pBufferInfo = &inputBufferInfo;
+        
+        VkDescriptorBufferInfo outputBufferInfo = {};
+        outputBufferInfo.buffer = m_outputBuffer;
+        outputBufferInfo.offset = 0;
+        outputBufferInfo.range = bufferSize;
+
+        descriptorWrites[1].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptorWrites[1].dstSet = m_descriptorSet;
+        descriptorWrites[1].dstBinding = 1;
+        descriptorWrites[1].dstArrayElement = 0;
+        descriptorWrites[1].descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptorWrites[1].descriptorCount = 1;
+        descriptorWrites[1].pBufferInfo = &outputBufferInfo;
+
+        vkUpdateDescriptorSets(m_device, 2, descriptorWrites.data(), 0, nullptr);
+    }
+
+    uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties) {
+        VkPhysicalDeviceMemoryProperties memProperties;
+        vkGetPhysicalDeviceMemoryProperties(m_physicalDevice, &memProperties);
+
+        for (uint32_t i = 0; i < memProperties.memoryTypeCount; i++) {
+            if ((typeFilter & (1 << i)) && (memProperties.memoryTypes[i].propertyFlags & properties) == properties) {
+                return i;
+            }
+        }
+
+        exit(EXIT_FAILURE);
+    }
+
+    void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory) {
+        VkBufferCreateInfo bufferInfo{};
+        bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+        bufferInfo.size = size;
+        bufferInfo.usage = usage;
+        bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+
+        if (vkCreateBuffer(m_device, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+            fprintf(stderr, "failed to create buffer!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        VkMemoryRequirements memRequirements;
+        vkGetBufferMemoryRequirements(m_device, buffer, &memRequirements);
+
+        VkMemoryAllocateInfo allocInfo{};
+        allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+        allocInfo.allocationSize = memRequirements.size;
+        allocInfo.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties);
+
+        if (vkAllocateMemory(m_device, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+            fprintf(stderr, "failed to allocate buffer memory!\n");
+            exit(EXIT_FAILURE);
+        }
+
+        vkBindBufferMemory(m_device, buffer, bufferMemory, 0);
+    }
+
     GLFWwindow* m_window;
     VkInstance m_instance;
     VkPhysicalDevice m_physicalDevice;
     VkDevice m_device;
     VkQueue m_computeQueue;
     VkDescriptorSetLayout m_descriptorSetLayout;
+    VkDescriptorPool m_descriptorPool;
+    VkDescriptorSet m_descriptorSet;
     VkPipeline m_computePipeline;
     VkPipelineLayout m_pipelineLayout;
     VkCommandPool m_commandPool;
     VkCommandBuffer m_commandBuffer;
+    VkBuffer m_inputBuffer;
+    VkDeviceMemory m_inputBufferMemory;
+    VkBuffer m_outputBuffer;
+    VkDeviceMemory m_outputBufferMemory;
 };
-
-/*
-
-void createDataBuffers(VkDevice device, VkBuffer* inputBuffer, VkDeviceMemory* inputBufferMemory, VkBuffer* outputBuffer, VkDeviceMemory* outputBufferMemory, size_t numElements) {
-    // Create input and output buffers
-
-    VkDeviceSize bufferSize = sizeof(int) * numElements;
-
-    VkBufferCreateInfo bufferInfo = {};
-    bufferInfo.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    bufferInfo.size = bufferSize;
-
-    vkCreateBuffer(device, &bufferInfo, NULL, inputBuffer);
-    vkCreateBuffer(device, &bufferInfo, NULL, outputBuffer);
-
-    // Allocate memory for the buffers
-
-    VkMemoryRequirements memRequirements;
-    vkGetBufferMemoryRequirements(device, *inputBuffer, &memRequirements);
-
-    VkMemoryAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    allocInfo.allocationSize = memRequirements.size;
-
-    // Find a memory type index that fits the properties of the buffer
-    // ...
-    allocInfo.memoryTypeIndex = 0; // Replace with the appropriate memory type index
-
-    vkAllocateMemory(device, &allocInfo, NULL, inputBufferMemory);
-    vkBindBufferMemory(device, *inputBuffer, *inputBufferMemory, 0);
-
-    vkAllocateMemory(device, &allocInfo, NULL, outputBufferMemory);
-    vkBindBufferMemory(device, *outputBuffer, *outputBufferMemory, 0);
-
-    // Map and fill the buffers
-    void* inputDataPtr;
-    void* outputDataPtr;
-
-    vkMapMemory(device, *inputBufferMemory, 0, bufferSize, 0, &inputDataPtr);
-    vkMapMemory(device, *outputBufferMemory, 0, bufferSize, 0, &outputDataPtr);
-
-    // Fill inputDataPtr and outputDataPtr with your data
-
-    vkUnmapMemory(device, *inputBufferMemory);
-    vkUnmapMemory(device, *outputBufferMemory);
-
-}
-*/
 
 int main() {
     ComputeShaderApp app;
