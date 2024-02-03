@@ -1,3 +1,52 @@
+#include <iostream>
+#include <string>
+#include <optional>
+
+#include "compute_interface.hpp"
+#include <vulkan/vk_enum_string_helper.h>
+
+std::optional<std::string> readFile(const char* filepath) {
+    // Read the shader code from the file
+    FILE* file = fopen(filepath, "rb");
+    if (!file) {
+        std::nullopt;
+    }
+    fseek(file, 0, SEEK_END);
+    size_t size = ftell(file);
+    rewind(file);
+    char* data = (char*)malloc(size);
+    fread(data, 1, size, file);
+    fclose(file);
+
+    std::string ret(data, size);
+    free(data);
+    
+    return ret;
+}
+
+const char* COMPUTE_SHADER_PATH = "shaders/test_compute_shader.spv";
+
+int main(int argc, char** argv) {
+
+    ComputeDevice compute_device = {};
+    VkResult res = VK_SUCCESS;
+    res = createComputeDevice(&compute_device);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
+        exit(EXIT_FAILURE);
+    }
+
+    // read shader
+    auto shader_source = readFile(COMPUTE_SHADER_PATH);
+    if (!shader_source.has_value()) {
+        fprintf(stderr, "Failed to open shader file: %s\n", COMPUTE_SHADER_PATH);
+        exit(EXIT_FAILURE);
+    }
+
+    return EXIT_SUCCESS;
+}
+
+#if 0
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 #include <vulkan/vulkan.h>
@@ -439,3 +488,4 @@ int main() {
 
     return EXIT_SUCCESS;
 }
+#endif

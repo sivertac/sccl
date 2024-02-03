@@ -15,5 +15,3 @@ add_custom_target(
 
 # Add the shader to the target
 add_dependencies(compute-shader-test compile-compute-shader)
-
-

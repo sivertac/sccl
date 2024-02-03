@@ -17,4 +17,4 @@ target_link_libraries(compute-shader-test PUBLIC glfw)
 target_link_libraries(compute-shader-test PUBLIC glm::glm)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shaders)
+#add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shaders)
