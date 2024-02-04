@@ -1,10 +1,103 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <unistd.h>
+#include <string.h>
 
 #include "compute_interface.hpp"
 
 namespace {
+
+const char* validation_layers[] = {
+    "VK_LAYER_KHRONOS_validation"
+};
+const size_t num_validation_layers = 1;
+
+VkResult CreateDebugUtilsMessengerEXT(
+    VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
+    const VkAllocationCallbacks *pAllocator,
+    VkDebugUtilsMessengerEXT *pDebugMessenger) {
+    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+        instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
+    } else {
+        return VK_ERROR_EXTENSION_NOT_PRESENT;
+    }
+}
+
+void DestroyDebugUtilsMessengerEXT(VkInstance instance,
+                                   VkDebugUtilsMessengerEXT debugMessenger,
+                                   const VkAllocationCallbacks *pAllocator) {
+    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+        instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != nullptr) {
+        func(instance, debugMessenger, pAllocator);
+    }
+}
+
+VKAPI_ATTR VkBool32 VKAPI_CALL
+debugCallback(VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+              VkDebugUtilsMessageTypeFlagsEXT messageType,
+              const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData,
+              void *pUserData) {
+    (void)messageSeverity;
+    (void)messageType;
+    (void)pUserData;
+    fprintf(stderr, "validation layer: %s\n", pCallbackData->pMessage);
+
+    return VK_FALSE;
+}
+
+void populateDebugMessengerCreateInfo(
+    VkDebugUtilsMessengerCreateInfoEXT &createInfo) {
+    createInfo = {};
+    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo.messageSeverity =
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
+        VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
+    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo.pfnUserCallback = debugCallback;
+}
+
+VkResult setupDebugMessenger(VkInstance instance, VkDebugUtilsMessengerEXT* debug_messenger) {
+    VkDebugUtilsMessengerCreateInfoEXT createInfo;
+    populateDebugMessengerCreateInfo(createInfo);
+
+    return CreateDebugUtilsMessengerEXT(instance, &createInfo, nullptr, debug_messenger);
+}
+
+bool checkValidationLayerSupport() {
+    uint32_t layer_count;
+    vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
+
+    VkLayerProperties* available_layers = NULL;
+    available_layers = (VkLayerProperties*)malloc(layer_count * sizeof(VkLayerProperties));
+
+    vkEnumerateInstanceLayerProperties(&layer_count, available_layers);
+
+    for (const char *layer_name : validation_layers) {
+        bool layer_found = false;
+
+        for (size_t i = 0; i < layer_count; ++i) {
+            VkLayerProperties* layer_properties = &available_layers[i];
+            if (strcmp(layer_name, layer_properties->layerName) == 0) {
+                layer_found = true;
+                break;
+            }
+        }
+
+        if (!layer_found) {
+            free(available_layers);
+            return false;
+        }
+    }
+
+    return true;
+}
+
 VkResult createInstance(VkInstance* instance) {
     *instance = VK_NULL_HANDLE;
 
@@ -185,16 +278,30 @@ VkResult findMemoryType(VkPhysicalDevice physical_device, uint32_t type_filter, 
 
 } // namespace
 
-VkResult createComputeDevice(ComputeDevice* compute_device) {
+VkResult createComputeDevice(bool enable_validation_layers, ComputeDevice* compute_device) {
     VkResult res = VK_SUCCESS;
     
     // zero init
     *compute_device = {};
 
+    // check if validation layers are supported
+    compute_device->m_validation_layers_enabled = enable_validation_layers;
+    if (compute_device->m_validation_layers_enabled) {
+        if (!checkValidationLayerSupport()) {
+            fprintf(stderr, "Validation layers not supported\n");
+            return VK_ERROR_UNKNOWN;
+        }
+    }
+
     // get vulkan instance
     res = createInstance(&compute_device->m_instance);
     if (res != VK_SUCCESS) {
         return res;
+    }
+
+    // enable validation layers
+    if (compute_device->m_validation_layers_enabled) {
+        setupDebugMessenger(compute_device->m_instance, &compute_device->m_debug_messenger);
     }
 
     // pick physical device
@@ -214,6 +321,11 @@ VkResult createComputeDevice(ComputeDevice* compute_device) {
 
 void destroyComputeDevice(ComputeDevice* compute_device) {
     vkDestroyDevice(compute_device->m_device, NULL);
+
+    if (compute_device->m_validation_layers_enabled) {
+        DestroyDebugUtilsMessengerEXT(compute_device->m_instance, compute_device->m_debug_messenger, NULL);
+    }
+
     vkDestroyInstance(compute_device->m_instance, NULL);
 }
 

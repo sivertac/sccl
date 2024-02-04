@@ -4,6 +4,29 @@
 
 #include "compute_interface.hpp"
 #include <vulkan/vk_enum_string_helper.h>
+#include "BinaryUtil.hpp"
+
+void printDataBuffers(const ComputeDevice* compute_device, size_t num_elements, VkDeviceMemory input_buffer_memory, VkDeviceMemory output_buffer_memory) {
+    VkDeviceSize buffer_size = sizeof(int) * num_elements;
+    
+    // Map and fill the buffers
+    void* inputDataPtr;
+    void* outputDataPtr;
+
+    vkMapMemory(compute_device->m_device, input_buffer_memory, 0, buffer_size, 0, &inputDataPtr);
+    vkMapMemory(compute_device->m_device, output_buffer_memory, 0, buffer_size, 0, &outputDataPtr);
+
+    // Print inputDataPtr and outputDataPtr
+    std::cout << "Input buffer:" << std::endl;
+    printBufferBinaryXxd((const char*)inputDataPtr, buffer_size);
+
+    std::cout << "Output buffer:" << std::endl;
+    printBufferBinaryXxd((const char*)outputDataPtr, buffer_size);
+
+
+    vkUnmapMemory(compute_device->m_device, input_buffer_memory);
+    vkUnmapMemory(compute_device->m_device, output_buffer_memory);
+}
 
 std::optional<std::string> readFile(const char* filepath) {
     // Read the shader code from the file
@@ -30,7 +53,7 @@ int main(int argc, char** argv) {
 
     ComputeDevice compute_device = {};
     VkResult res = VK_SUCCESS;
-    res = createComputeDevice(&compute_device);
+    res = createComputeDevice(true, &compute_device);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
         exit(EXIT_FAILURE);
@@ -42,6 +65,54 @@ int main(int argc, char** argv) {
         fprintf(stderr, "Failed to open shader file: %s\n", COMPUTE_SHADER_PATH);
         exit(EXIT_FAILURE);
     }
+
+    // create buffers
+    ComputeBuffer input_buffer;
+    res = createComputeBuffer(&compute_device, 1000, &input_buffer);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
+        exit(EXIT_FAILURE);
+    }
+    ComputeBuffer output_buffer;
+    res = createComputeBuffer(&compute_device, 1000, &output_buffer);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
+        exit(EXIT_FAILURE);
+    }
+
+    // create compute pipeline
+    ComputePipeline compute_pipeline;
+    res = createComputePipeline(
+        &compute_device, 
+        shader_source.value().data(), 
+        shader_source.value().size(), 
+        1, 
+        1, 
+        &compute_pipeline
+    );
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
+        exit(EXIT_FAILURE);
+    }
+
+    // create descriptor set
+    ComputeDescriptorSet compute_descriptor_set;
+    res = createComputeDescriptorSet(&compute_device, &compute_pipeline, &compute_descriptor_set);
+    if (res != VK_SUCCESS) {
+        fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
+        exit(EXIT_FAILURE);
+    }
+
+    // update descriptor set
+    res = updateComputeDescriptorSet(&compute_device, &input_buffer, 1, &output_buffer, 1, &compute_descriptor_set);
+
+    // run compute
+    uint32_t size = 10;
+    printDataBuffers(&compute_device, size, input_buffer.m_buffer_memory, output_buffer.m_buffer_memory);
+    runComputePipelineSync(&compute_device, &compute_pipeline, &compute_descriptor_set, size, 1, 1);
+    printDataBuffers(&compute_device, size, input_buffer.m_buffer_memory, output_buffer.m_buffer_memory);
+
+    destroyComputeDevice(&compute_device);
 
     return EXIT_SUCCESS;
 }

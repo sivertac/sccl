@@ -8,8 +8,9 @@ struct ComputeDevice {
     VkInstance m_instance;
     VkPhysicalDevice m_physical_device;
     VkDevice m_device;
+    bool m_validation_layers_enabled;
+    VkDebugUtilsMessengerEXT m_debug_messenger;
 };
-
 
 struct ComputePipeline {
     VkQueue m_queue;
@@ -32,7 +33,7 @@ struct ComputeBuffer {
     VkDeviceSize m_size;
 };
 
-VkResult createComputeDevice(ComputeDevice* compute_device);
+VkResult createComputeDevice(bool enable_validation_layers, ComputeDevice* compute_device);
 
 void destroyComputeDevice(ComputeDevice* compute_device);
 
