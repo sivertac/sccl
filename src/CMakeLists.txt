@@ -7,4 +7,3 @@ target_sources(compute_shader_test PRIVATE
     ${CMAKE_CURRENT_SOURCE_DIR}/binary_util.cpp
 )
 target_include_directories(compute_shader_test PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
-target_link_libraries(compute_shader_test PRIVATE compute_interface)

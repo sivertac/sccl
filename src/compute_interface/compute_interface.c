@@ -3,40 +3,40 @@
 #include <string.h>
 #include <unistd.h>
 
-#include "compute_interface.hpp"
-
-namespace
-{
+#include "compute_interface.h"
 
 const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
 const size_t num_validation_layers = 1;
 
-VkResult create_debug_utils_messenger_ext(
+static VkResult create_debug_utils_messenger_ext(
     VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
     const VkAllocationCallbacks *pAllocator,
     VkDebugUtilsMessengerEXT *pDebugMessenger)
 {
-    auto func = (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-        instance, "vkCreateDebugUtilsMessengerEXT");
-    if (func != nullptr) {
+    PFN_vkCreateDebugUtilsMessengerEXT func =
+        (PFN_vkCreateDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            instance, "vkCreateDebugUtilsMessengerEXT");
+    if (func != NULL) {
         return func(instance, pCreateInfo, pAllocator, pDebugMessenger);
     } else {
         return VK_ERROR_EXTENSION_NOT_PRESENT;
     }
 }
 
-void destroy_debug_utils_messenger_ext(VkInstance instance,
-                                       VkDebugUtilsMessengerEXT debugMessenger,
-                                       const VkAllocationCallbacks *pAllocator)
+static void
+destroy_debug_utils_messenger_ext(VkInstance instance,
+                                  VkDebugUtilsMessengerEXT debugMessenger,
+                                  const VkAllocationCallbacks *pAllocator)
 {
-    auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
-        instance, "vkDestroyDebugUtilsMessengerEXT");
-    if (func != nullptr) {
+    PFN_vkDestroyDebugUtilsMessengerEXT func =
+        (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
+            instance, "vkDestroyDebugUtilsMessengerEXT");
+    if (func != NULL) {
         func(instance, debugMessenger, pAllocator);
     }
 }
 
-VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
+static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
     VkDebugUtilsMessageTypeFlagsEXT messageType,
     const VkDebugUtilsMessengerCallbackDataEXT *pCallbackData, void *pUserData)
@@ -49,35 +49,35 @@ VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     return VK_FALSE;
 }
 
-void populate_debug_messenger_create_info(
-    VkDebugUtilsMessengerCreateInfoEXT &createInfo)
+static void populate_debug_messenger_create_info(
+    VkDebugUtilsMessengerCreateInfoEXT *createInfo)
 {
-    createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
-    createInfo.messageSeverity =
+    memset(createInfo, 0, sizeof(VkDebugUtilsMessengerCreateInfoEXT));
+    createInfo->sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_MESSENGER_CREATE_INFO_EXT;
+    createInfo->messageSeverity =
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_VERBOSE_BIT_EXT |
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT |
         VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT;
-    createInfo.messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
-                             VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
-    createInfo.pfnUserCallback = debug_callback;
+    createInfo->messageType = VK_DEBUG_UTILS_MESSAGE_TYPE_GENERAL_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT |
+                              VK_DEBUG_UTILS_MESSAGE_TYPE_PERFORMANCE_BIT_EXT;
+    createInfo->pfnUserCallback = debug_callback;
 }
 
-VkResult setup_debug_messenger(VkInstance instance,
-                               VkDebugUtilsMessengerEXT *debug_messenger)
+static VkResult setup_debug_messenger(VkInstance instance,
+                                      VkDebugUtilsMessengerEXT *debug_messenger)
 {
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
-    populate_debug_messenger_create_info(createInfo);
+    populate_debug_messenger_create_info(&createInfo);
 
-    return create_debug_utils_messenger_ext(instance, &createInfo, nullptr,
+    return create_debug_utils_messenger_ext(instance, &createInfo, NULL,
                                             debug_messenger);
 }
 
-bool check_validation_layer_support()
+static bool check_validation_layer_support()
 {
     uint32_t layer_count;
-    vkEnumerateInstanceLayerProperties(&layer_count, nullptr);
+    vkEnumerateInstanceLayerProperties(&layer_count, NULL);
 
     VkLayerProperties *available_layers = NULL;
     available_layers =
@@ -85,7 +85,9 @@ bool check_validation_layer_support()
 
     vkEnumerateInstanceLayerProperties(&layer_count, available_layers);
 
-    for (const char *layer_name : validation_layers) {
+    for (size_t layer_index = 0; layer_index < num_validation_layers;
+         ++layer_index) {
+        const char *layer_name = validation_layers[layer_index];
         bool layer_found = false;
 
         for (size_t i = 0; i < layer_count; ++i) {
@@ -105,7 +107,8 @@ bool check_validation_layer_support()
     return true;
 }
 
-VkResult create_instance(bool enable_validation_layers, VkInstance *instance)
+static VkResult create_instance(bool enable_validation_layers,
+                                VkInstance *instance)
 {
     *instance = VK_NULL_HANDLE;
 
@@ -131,8 +134,8 @@ VkResult create_instance(bool enable_validation_layers, VkInstance *instance)
     return vkCreateInstance(&create_info, NULL, instance);
 }
 
-VkResult pick_physical_device(VkInstance instance,
-                              VkPhysicalDevice *physical_device)
+static VkResult pick_physical_device(VkInstance instance,
+                                     VkPhysicalDevice *physical_device)
 {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
@@ -160,8 +163,8 @@ VkResult pick_physical_device(VkInstance instance,
     return VK_SUCCESS;
 }
 
-VkResult create_logical_device(VkPhysicalDevice physical_device,
-                               VkDevice *device)
+static VkResult create_logical_device(VkPhysicalDevice physical_device,
+                                      VkDevice *device)
 {
     float queuePriority = 1.0f; // Priority of the compute queue (0.0 to 1.0)
 
@@ -180,9 +183,9 @@ VkResult create_logical_device(VkPhysicalDevice physical_device,
     return vkCreateDevice(physical_device, &deviceCreateInfo, NULL, device);
 }
 
-VkResult create_shader_module(VkDevice device, const char *shader_source,
-                              size_t shader_source_size,
-                              VkShaderModule *shader_module)
+static VkResult create_shader_module(VkDevice device, const char *shader_source,
+                                     size_t shader_source_size,
+                                     VkShaderModule *shader_module)
 {
     // Create shader module
     VkShaderModuleCreateInfo createInfo = {};
@@ -193,7 +196,7 @@ VkResult create_shader_module(VkDevice device, const char *shader_source,
     return vkCreateShaderModule(device, &createInfo, NULL, shader_module);
 }
 
-VkResult
+static VkResult
 create_descriptor_set_layout(VkDevice device, uint32_t num_input_descriptors,
                              uint32_t num_output_descriptors,
                              VkDescriptorSetLayout *descriptor_set_layout)
@@ -221,27 +224,27 @@ create_descriptor_set_layout(VkDevice device, uint32_t num_input_descriptors,
                                        descriptor_set_layout);
 }
 
-VkResult create_descriptor_pool(VkDevice device,
-                                VkDescriptorPoolSize *descriptor_pool_sizes,
-                                uint32_t num_descriptor_pool_sizes,
-                                uint32_t max_sets,
-                                VkDescriptorPool *descriptor_pool)
+static VkResult
+create_descriptor_pool(VkDevice device,
+                       VkDescriptorPoolSize *descriptor_pool_sizes,
+                       uint32_t num_descriptor_pool_sizes, uint32_t max_sets,
+                       VkDescriptorPool *descriptor_pool)
 {
 
-    VkDescriptorPoolCreateInfo poolInfo{};
+    VkDescriptorPoolCreateInfo poolInfo;
+    memset(&poolInfo, 0, sizeof(VkDescriptorPoolCreateInfo));
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = num_descriptor_pool_sizes;
     poolInfo.pPoolSizes = descriptor_pool_sizes;
     poolInfo.maxSets = max_sets;
 
-    return vkCreateDescriptorPool(device, &poolInfo, nullptr, descriptor_pool);
+    return vkCreateDescriptorPool(device, &poolInfo, NULL, descriptor_pool);
 }
 
-VkResult create_compute_pipeline(VkDevice device,
-                                 VkDescriptorSetLayout descriptor_set_layout,
-                                 VkShaderModule shader_module,
-                                 VkPipelineLayout *pipeline_layout,
-                                 VkPipeline *compute_pipeline)
+static VkResult create_compute_pipeline_impl(
+    VkDevice device, VkDescriptorSetLayout descriptor_set_layout,
+    VkShaderModule shader_module, VkPipelineLayout *pipeline_layout,
+    VkPipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
 
@@ -277,8 +280,9 @@ VkResult create_compute_pipeline(VkDevice device,
     return res;
 }
 
-VkResult create_command_buffer(VkDevice device, VkCommandPool *command_pool,
-                               VkCommandBuffer *command_buffer)
+static VkResult create_command_buffer(VkDevice device,
+                                      VkCommandPool *command_pool,
+                                      VkCommandBuffer *command_buffer)
 {
     VkResult res = VK_SUCCESS;
 
@@ -307,10 +311,10 @@ VkResult create_command_buffer(VkDevice device, VkCommandPool *command_pool,
     return res;
 }
 
-VkResult find_memory_type(VkPhysicalDevice physical_device,
-                          uint32_t type_filter,
-                          VkMemoryPropertyFlags properties,
-                          uint32_t *output_index)
+static VkResult find_memory_type(VkPhysicalDevice physical_device,
+                                 uint32_t type_filter,
+                                 VkMemoryPropertyFlags properties,
+                                 uint32_t *output_index)
 {
     VkPhysicalDeviceMemoryProperties mem_properties;
     vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
@@ -327,15 +331,13 @@ VkResult find_memory_type(VkPhysicalDevice physical_device,
     return VK_ERROR_UNKNOWN;
 }
 
-} // namespace
-
 VkResult create_compute_device(bool enable_validation_layers,
                                ComputeDevice *compute_device)
 {
     VkResult res = VK_SUCCESS;
 
     // zero init
-    *compute_device = {};
+    memset(compute_device, 0, sizeof(ComputeDevice));
 
     // check if validation layers are supported
     compute_device->m_validation_layers_enabled = enable_validation_layers;
@@ -399,7 +401,7 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
     VkResult res = VK_SUCCESS;
 
     // zero init
-    *compute_pipeline = {};
+    memset(compute_pipeline, 0, sizeof(ComputePipeline));
 
     // get queue
     vkGetDeviceQueue(
@@ -416,13 +418,15 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
 
     // create descriptor pool
     const int num_descriptor_types = 2;
-    VkDescriptorPoolSize descriptor_pool_sizes[num_descriptor_types] = {};
+    VkDescriptorPoolSize descriptor_pool_sizes[num_descriptor_types];
+    memset(descriptor_pool_sizes, 0,
+           sizeof(VkDescriptorPoolSize) * num_descriptor_types);
     descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptor_pool_sizes[0].descriptorCount =
-        static_cast<uint32_t>(num_input_buffers + num_output_buffers);
+        (uint32_t)(num_input_buffers + num_output_buffers);
     descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_pool_sizes[1].descriptorCount =
-        static_cast<uint32_t>(num_input_buffers + num_output_buffers);
+        (uint32_t)(num_input_buffers + num_output_buffers);
     res = create_descriptor_pool(compute_device->m_device,
                                  descriptor_pool_sizes, num_descriptor_types, 1,
                                  &compute_pipeline->m_descriptor_pool);
@@ -439,7 +443,7 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
     }
 
     // create compute pipeline
-    res = create_compute_pipeline(
+    res = create_compute_pipeline_impl(
         compute_device->m_device, compute_pipeline->m_descriptor_set_layout,
         compute_pipeline->m_shader_module, &compute_pipeline->m_pipeline_layout,
         &compute_pipeline->m_compute_pipeline);
@@ -516,7 +520,7 @@ VkResult update_compute_descriptor_set(
     }
 
     vkUpdateDescriptorSets(compute_device->m_device, num_descriptor_writes,
-                           descriptor_writes, 0, nullptr);
+                           descriptor_writes, 0, NULL);
 
     free(descriptor_writes);
 
@@ -548,10 +552,10 @@ run_compute_pipeline_sync(const ComputeDevice *compute_device,
                       compute_pipeline->m_compute_pipeline);
 
     // Bind descriptor sets
-    vkCmdBindDescriptorSets(
-        compute_pipeline->m_command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-        compute_pipeline->m_pipeline_layout, 0, 1,
-        &compute_descriptor_set->m_descriptor_set, 0, nullptr);
+    vkCmdBindDescriptorSets(compute_pipeline->m_command_buffer,
+                            VK_PIPELINE_BIND_POINT_COMPUTE,
+                            compute_pipeline->m_pipeline_layout, 0, 1,
+                            &compute_descriptor_set->m_descriptor_set, 0, NULL);
 
     // Dispatch the compute shader
     vkCmdDispatch(compute_pipeline->m_command_buffer, group_count_x,
@@ -606,13 +610,13 @@ create_compute_descriptor_set(const ComputeDevice *compute_device,
     VkResult res = VK_SUCCESS;
 
     // zero init
-    *compute_descriptor_set = {};
+    memset(compute_descriptor_set, 0, sizeof(ComputeDescriptorSet));
 
     // Create descriptor set
     VkDescriptorSetAllocateInfo allocInfo = {};
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = compute_pipeline->m_descriptor_pool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
+    allocInfo.descriptorSetCount = (uint32_t)1;
     allocInfo.pSetLayouts = &compute_pipeline->m_descriptor_set_layout;
 
     res = vkAllocateDescriptorSets(compute_device->m_device, &allocInfo,
@@ -630,15 +634,16 @@ VkResult create_compute_buffer(const ComputeDevice *compute_device,
     VkResult res = VK_SUCCESS;
 
     // zero init
-    *compute_buffer = {};
+    memset(compute_buffer, 0, sizeof(ComputeBuffer));
 
     // create buffer
-    VkBufferCreateInfo buffer_info{};
+    VkBufferCreateInfo buffer_info;
+    memset(&buffer_info, 0, sizeof(VkBufferCreateInfo));
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_info.size = size;
     buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    res = vkCreateBuffer(compute_device->m_device, &buffer_info, nullptr,
+    res = vkCreateBuffer(compute_device->m_device, &buffer_info, NULL,
                          &compute_buffer->m_buffer);
     if (res != VK_SUCCESS) {
         return res;
@@ -660,12 +665,13 @@ VkResult create_compute_buffer(const ComputeDevice *compute_device,
         return res;
     }
 
-    VkMemoryAllocateInfo alloc_info{};
+    VkMemoryAllocateInfo alloc_info;
+    memset(&alloc_info, 0, sizeof(VkMemoryAllocateInfo));
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = mem_requirements.size;
     alloc_info.memoryTypeIndex = memory_type_index;
 
-    res = vkAllocateMemory(compute_device->m_device, &alloc_info, nullptr,
+    res = vkAllocateMemory(compute_device->m_device, &alloc_info, NULL,
                            &compute_buffer->m_buffer_memory);
     if (res != VK_SUCCESS) {
         return res;

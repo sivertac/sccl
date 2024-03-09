@@ -2,17 +2,18 @@
 #ifndef COMPUTE_INTERFACE_HEADER
 #define COMPUTE_INTERFACE_HEADER
 
+#include <stdbool.h>
 #include <vulkan/vulkan.h>
 
-struct ComputeDevice {
+typedef struct ComputeDevice {
     VkInstance m_instance;
     VkPhysicalDevice m_physical_device;
     VkDevice m_device;
     bool m_validation_layers_enabled;
     VkDebugUtilsMessengerEXT m_debug_messenger;
-};
+} ComputeDevice;
 
-struct ComputePipeline {
+typedef struct ComputePipeline {
     VkQueue m_queue;
     VkDescriptorSetLayout m_descriptor_set_layout;
     VkDescriptorPool m_descriptor_pool;
@@ -21,17 +22,17 @@ struct ComputePipeline {
     VkPipeline m_compute_pipeline;
     VkCommandPool m_command_pool;
     VkCommandBuffer m_command_buffer;
-};
+} ComputePipeline;
 
-struct ComputeDescriptorSet {
+typedef struct ComputeDescriptorSet {
     VkDescriptorSet m_descriptor_set;
-};
+} ComputeDescriptorSet;
 
-struct ComputeBuffer {
+typedef struct ComputeBuffer {
     VkBuffer m_buffer;
     VkDeviceMemory m_buffer_memory;
     VkDeviceSize m_size;
-};
+} ComputeBuffer;
 
 VkResult create_compute_device(bool enable_validation_layers,
                                ComputeDevice *compute_device);
