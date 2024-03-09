@@ -11,14 +11,16 @@ find_package(glfw3 3.3.2 REQUIRED)
 # clang-tidy
 set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
 
-add_executable(compute-shader-test)
+add_library(compute_interface)
 
-target_compile_features(compute-shader-test PRIVATE cxx_std_20)
-target_compile_options(compute-shader-test PRIVATE -Wall -Wextra -Wswitch)
+add_executable(compute_shader_test)
 
-target_link_libraries(compute-shader-test PUBLIC Vulkan::Vulkan)
-target_link_libraries(compute-shader-test PUBLIC glfw)
-target_link_libraries(compute-shader-test PUBLIC glm::glm)
+target_compile_features(compute_shader_test PRIVATE cxx_std_20)
+target_compile_options(compute_shader_test PRIVATE -Wall -Wextra -Wswitch)
+
+target_link_libraries(compute_shader_test PUBLIC Vulkan::Vulkan)
+target_link_libraries(compute_shader_test PUBLIC glfw)
+target_link_libraries(compute_shader_test PUBLIC glm::glm)
 
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/src)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/shaders)
