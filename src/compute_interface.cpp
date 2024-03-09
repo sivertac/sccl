@@ -26,8 +26,8 @@ VkResult create_debug_utils_messenger_ext(
 }
 
 void destroy_debug_utils_messenger_ext(VkInstance instance,
-                                   VkDebugUtilsMessengerEXT debugMessenger,
-                                   const VkAllocationCallbacks *pAllocator)
+                                       VkDebugUtilsMessengerEXT debugMessenger,
+                                       const VkAllocationCallbacks *pAllocator)
 {
     auto func = (PFN_vkDestroyDebugUtilsMessengerEXT)vkGetInstanceProcAddr(
         instance, "vkDestroyDebugUtilsMessengerEXT");
@@ -65,13 +65,13 @@ void populate_debug_messenger_create_info(
 }
 
 VkResult setup_debug_messenger(VkInstance instance,
-                             VkDebugUtilsMessengerEXT *debug_messenger)
+                               VkDebugUtilsMessengerEXT *debug_messenger)
 {
     VkDebugUtilsMessengerCreateInfoEXT createInfo;
     populate_debug_messenger_create_info(createInfo);
 
     return create_debug_utils_messenger_ext(instance, &createInfo, nullptr,
-                                        debug_messenger);
+                                            debug_messenger);
 }
 
 bool check_validation_layer_support()
@@ -132,7 +132,7 @@ VkResult create_instance(bool enable_validation_layers, VkInstance *instance)
 }
 
 VkResult pick_physical_device(VkInstance instance,
-                            VkPhysicalDevice *physical_device)
+                              VkPhysicalDevice *physical_device)
 {
     uint32_t deviceCount = 0;
     vkEnumeratePhysicalDevices(instance, &deviceCount, NULL);
@@ -160,7 +160,8 @@ VkResult pick_physical_device(VkInstance instance,
     return VK_SUCCESS;
 }
 
-VkResult create_logical_device(VkPhysicalDevice physical_device, VkDevice *device)
+VkResult create_logical_device(VkPhysicalDevice physical_device,
+                               VkDevice *device)
 {
     float queuePriority = 1.0f; // Priority of the compute queue (0.0 to 1.0)
 
@@ -180,8 +181,8 @@ VkResult create_logical_device(VkPhysicalDevice physical_device, VkDevice *devic
 }
 
 VkResult create_shader_module(VkDevice device, const char *shader_source,
-                            size_t shader_source_size,
-                            VkShaderModule *shader_module)
+                              size_t shader_source_size,
+                              VkShaderModule *shader_module)
 {
     // Create shader module
     VkShaderModuleCreateInfo createInfo = {};
@@ -192,10 +193,10 @@ VkResult create_shader_module(VkDevice device, const char *shader_source,
     return vkCreateShaderModule(device, &createInfo, NULL, shader_module);
 }
 
-VkResult create_descriptor_set_layout(VkDevice device,
-                                   uint32_t num_input_descriptors,
-                                   uint32_t num_output_descriptors,
-                                   VkDescriptorSetLayout *descriptor_set_layout)
+VkResult
+create_descriptor_set_layout(VkDevice device, uint32_t num_input_descriptors,
+                             uint32_t num_output_descriptors,
+                             VkDescriptorSetLayout *descriptor_set_layout)
 {
     VkDescriptorSetLayoutBinding inputBinding = {};
     inputBinding.binding = 0;
@@ -221,10 +222,10 @@ VkResult create_descriptor_set_layout(VkDevice device,
 }
 
 VkResult create_descriptor_pool(VkDevice device,
-                              VkDescriptorPoolSize *descriptor_pool_sizes,
-                              uint32_t num_descriptor_pool_sizes,
-                              uint32_t max_sets,
-                              VkDescriptorPool *descriptor_pool)
+                                VkDescriptorPoolSize *descriptor_pool_sizes,
+                                uint32_t num_descriptor_pool_sizes,
+                                uint32_t max_sets,
+                                VkDescriptorPool *descriptor_pool)
 {
 
     VkDescriptorPoolCreateInfo poolInfo{};
@@ -237,10 +238,10 @@ VkResult create_descriptor_pool(VkDevice device,
 }
 
 VkResult create_compute_pipeline(VkDevice device,
-                               VkDescriptorSetLayout descriptor_set_layout,
-                               VkShaderModule shader_module,
-                               VkPipelineLayout *pipeline_layout,
-                               VkPipeline *compute_pipeline)
+                                 VkDescriptorSetLayout descriptor_set_layout,
+                                 VkShaderModule shader_module,
+                                 VkPipelineLayout *pipeline_layout,
+                                 VkPipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
 
@@ -277,7 +278,7 @@ VkResult create_compute_pipeline(VkDevice device,
 }
 
 VkResult create_command_buffer(VkDevice device, VkCommandPool *command_pool,
-                             VkCommandBuffer *command_buffer)
+                               VkCommandBuffer *command_buffer)
 {
     VkResult res = VK_SUCCESS;
 
@@ -306,9 +307,10 @@ VkResult create_command_buffer(VkDevice device, VkCommandPool *command_pool,
     return res;
 }
 
-VkResult find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter,
-                        VkMemoryPropertyFlags properties,
-                        uint32_t *output_index)
+VkResult find_memory_type(VkPhysicalDevice physical_device,
+                          uint32_t type_filter,
+                          VkMemoryPropertyFlags properties,
+                          uint32_t *output_index)
 {
     VkPhysicalDeviceMemoryProperties mem_properties;
     vkGetPhysicalDeviceMemoryProperties(physical_device, &mem_properties);
@@ -328,7 +330,7 @@ VkResult find_memory_type(VkPhysicalDevice physical_device, uint32_t type_filter
 } // namespace
 
 VkResult create_compute_device(bool enable_validation_layers,
-                             ComputeDevice *compute_device)
+                               ComputeDevice *compute_device)
 {
     VkResult res = VK_SUCCESS;
 
@@ -345,7 +347,8 @@ VkResult create_compute_device(bool enable_validation_layers,
     }
 
     // get vulkan instance
-    res = create_instance(enable_validation_layers, &compute_device->m_instance);
+    res =
+        create_instance(enable_validation_layers, &compute_device->m_instance);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -353,19 +356,19 @@ VkResult create_compute_device(bool enable_validation_layers,
     // enable validation layers
     if (compute_device->m_validation_layers_enabled) {
         setup_debug_messenger(compute_device->m_instance,
-                            &compute_device->m_debug_messenger);
+                              &compute_device->m_debug_messenger);
     }
 
     // pick physical device
     res = pick_physical_device(compute_device->m_instance,
-                             &compute_device->m_physical_device);
+                               &compute_device->m_physical_device);
     if (res != VK_SUCCESS) {
         return res;
     }
 
     // create logical device
     res = create_logical_device(compute_device->m_physical_device,
-                              &compute_device->m_device);
+                                &compute_device->m_device);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -379,18 +382,19 @@ void destroy_compute_device(ComputeDevice *compute_device)
 
     if (compute_device->m_validation_layers_enabled) {
         destroy_debug_utils_messenger_ext(compute_device->m_instance,
-                                      compute_device->m_debug_messenger, NULL);
+                                          compute_device->m_debug_messenger,
+                                          NULL);
     }
 
     vkDestroyInstance(compute_device->m_instance, NULL);
 }
 
 VkResult create_compute_pipeline(const ComputeDevice *compute_device,
-                               const char *shader_source,
-                               const size_t shader_source_size,
-                               const int num_input_buffers,
-                               const int num_output_buffers,
-                               ComputePipeline *compute_pipeline)
+                                 const char *shader_source,
+                                 const size_t shader_source_size,
+                                 const int num_input_buffers,
+                                 const int num_output_buffers,
+                                 ComputePipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
 
@@ -403,9 +407,9 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
         &compute_pipeline->m_queue); // Queue family index 0, queue index 0
 
     // create descriptor set layout
-    res = create_descriptor_set_layout(compute_device->m_device, num_input_buffers,
-                                    num_output_buffers,
-                                    &compute_pipeline->m_descriptor_set_layout);
+    res = create_descriptor_set_layout(
+        compute_device->m_device, num_input_buffers, num_output_buffers,
+        &compute_pipeline->m_descriptor_set_layout);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -419,17 +423,17 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
     descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_pool_sizes[1].descriptorCount =
         static_cast<uint32_t>(num_input_buffers + num_output_buffers);
-    res = create_descriptor_pool(compute_device->m_device, descriptor_pool_sizes,
-                               num_descriptor_types, 1,
-                               &compute_pipeline->m_descriptor_pool);
+    res = create_descriptor_pool(compute_device->m_device,
+                                 descriptor_pool_sizes, num_descriptor_types, 1,
+                                 &compute_pipeline->m_descriptor_pool);
     if (res != VK_SUCCESS) {
         return res;
     }
 
     // create shader module
     res = create_shader_module(compute_device->m_device, shader_source,
-                             shader_source_size,
-                             &compute_pipeline->m_shader_module);
+                               shader_source_size,
+                               &compute_pipeline->m_shader_module);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -445,8 +449,8 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
 
     // create command buffer
     res = create_command_buffer(compute_device->m_device,
-                              &compute_pipeline->m_command_pool,
-                              &compute_pipeline->m_command_buffer);
+                                &compute_pipeline->m_command_pool,
+                                &compute_pipeline->m_command_buffer);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -521,11 +525,11 @@ VkResult update_compute_descriptor_set(
 
 VkResult
 run_compute_pipeline_sync(const ComputeDevice *compute_device,
-                       const ComputePipeline *compute_pipeline,
-                       const ComputeDescriptorSet *compute_descriptor_set,
-                       const uint32_t group_count_x,
-                       const uint32_t group_count_y,
-                       const uint32_t group_count_z)
+                          const ComputePipeline *compute_pipeline,
+                          const ComputeDescriptorSet *compute_descriptor_set,
+                          const uint32_t group_count_x,
+                          const uint32_t group_count_y,
+                          const uint32_t group_count_z)
 {
     (void)compute_device;
     VkResult res = VK_SUCCESS;
@@ -573,7 +577,7 @@ run_compute_pipeline_sync(const ComputeDevice *compute_device,
 }
 
 void destroy_compute_pipeline(const ComputeDevice *compute_device,
-                            ComputePipeline *compute_pipeline)
+                              ComputePipeline *compute_pipeline)
 {
     vkDestroyDescriptorPool(compute_device->m_device,
                             compute_pipeline->m_descriptor_pool,
@@ -596,8 +600,8 @@ void destroy_compute_pipeline(const ComputeDevice *compute_device,
 
 VkResult
 create_compute_descriptor_set(const ComputeDevice *compute_device,
-                           const ComputePipeline *compute_pipeline,
-                           ComputeDescriptorSet *compute_descriptor_set)
+                              const ComputePipeline *compute_pipeline,
+                              ComputeDescriptorSet *compute_descriptor_set)
 {
     VkResult res = VK_SUCCESS;
 
@@ -621,7 +625,7 @@ create_compute_descriptor_set(const ComputeDevice *compute_device,
 }
 
 VkResult create_compute_buffer(const ComputeDevice *compute_device,
-                             VkDeviceSize size, ComputeBuffer *compute_buffer)
+                               VkDeviceSize size, ComputeBuffer *compute_buffer)
 {
     VkResult res = VK_SUCCESS;
 
@@ -648,10 +652,10 @@ VkResult create_compute_buffer(const ComputeDevice *compute_device,
     // find memory type
     uint32_t memory_type_index;
     res = find_memory_type(compute_device->m_physical_device,
-                         mem_requirements.memoryTypeBits,
-                         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                             VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
-                         &memory_type_index);
+                           mem_requirements.memoryTypeBits,
+                           VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                               VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+                           &memory_type_index);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -679,7 +683,7 @@ VkResult create_compute_buffer(const ComputeDevice *compute_device,
 }
 
 void destroy_compute_buffer(const ComputeDevice *compute_device,
-                          ComputeBuffer *compute_buffer)
+                            ComputeBuffer *compute_buffer)
 {
     vkFreeMemory(compute_device->m_device, compute_buffer->m_buffer_memory,
                  VK_NULL_HANDLE);

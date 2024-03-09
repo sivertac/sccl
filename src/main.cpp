@@ -6,16 +6,17 @@
 #include "compute_interface.hpp"
 #include <vulkan/vk_enum_string_helper.h>
 
-#define UNWRAP_VKRESULT(result) do {                                    \
-    if (result != VK_SUCCESS) {                                         \
-        fprintf(stderr, "Vulkan error: %s\n", string_VkResult(result)); \
-        exit(EXIT_FAILURE);                                             \
-    }                                                                   \
-} while (0)
+#define UNWRAP_VKRESULT(result)                                                \
+    do {                                                                       \
+        if (result != VK_SUCCESS) {                                            \
+            fprintf(stderr, "Vulkan error: %s\n", string_VkResult(result));    \
+            exit(EXIT_FAILURE);                                                \
+        }                                                                      \
+    } while (0)
 
-void print_data_buffers(const ComputeDevice *compute_device, size_t num_elements,
-                      VkDeviceMemory input_buffer_memory,
-                      VkDeviceMemory output_buffer_memory)
+void print_data_buffers(const ComputeDevice *compute_device,
+                        size_t num_elements, VkDeviceMemory input_buffer_memory,
+                        VkDeviceMemory output_buffer_memory)
 {
     VkDeviceSize buffer_size = sizeof(int) * num_elements;
 
@@ -79,33 +80,36 @@ int main(int argc, char **argv)
 
     // create buffers
     ComputeBuffer input_buffer;
-    UNWRAP_VKRESULT(create_compute_buffer(&compute_device, 1000, &input_buffer));
+    UNWRAP_VKRESULT(
+        create_compute_buffer(&compute_device, 1000, &input_buffer));
     ComputeBuffer output_buffer;
-    UNWRAP_VKRESULT(create_compute_buffer(&compute_device, 1000, &output_buffer));
+    UNWRAP_VKRESULT(
+        create_compute_buffer(&compute_device, 1000, &output_buffer));
 
     // create compute pipeline
     ComputePipeline compute_pipeline;
-    UNWRAP_VKRESULT(create_compute_pipeline(&compute_device, shader_source.value().data(),
-                                shader_source.value().size(), 1, 1,
-                                &compute_pipeline));
+    UNWRAP_VKRESULT(create_compute_pipeline(
+        &compute_device, shader_source.value().data(),
+        shader_source.value().size(), 1, 1, &compute_pipeline));
 
     // create descriptor set
     ComputeDescriptorSet compute_descriptor_set;
-    UNWRAP_VKRESULT(create_compute_descriptor_set(&compute_device, &compute_pipeline,
-                                     &compute_descriptor_set));
+    UNWRAP_VKRESULT(create_compute_descriptor_set(
+        &compute_device, &compute_pipeline, &compute_descriptor_set));
 
     // update descriptor set
-    UNWRAP_VKRESULT(update_compute_descriptor_set(&compute_device, &input_buffer, 1,
-                                   &output_buffer, 1, &compute_descriptor_set));
+    UNWRAP_VKRESULT(update_compute_descriptor_set(
+        &compute_device, &input_buffer, 1, &output_buffer, 1,
+        &compute_descriptor_set));
 
     // run compute
     uint32_t size = 10;
     print_data_buffers(&compute_device, size, input_buffer.m_buffer_memory,
-                     output_buffer.m_buffer_memory);
+                       output_buffer.m_buffer_memory);
     run_compute_pipeline_sync(&compute_device, &compute_pipeline,
-                           &compute_descriptor_set, size, 1, 1);
+                              &compute_descriptor_set, size, 1, 1);
     print_data_buffers(&compute_device, size, input_buffer.m_buffer_memory,
-                     output_buffer.m_buffer_memory);
+                       output_buffer.m_buffer_memory);
 
     // cleanup
     destroy_compute_buffer(&compute_device, &input_buffer);
