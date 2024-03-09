@@ -20,5 +20,3 @@ compile_shader(
     ${CMAKE_CURRENT_BINARY_DIR}/test_compute_shader.spv
 )
 
-# Add the shader to the target
-add_dependencies(compute_shader_test compile_compute_shader)
