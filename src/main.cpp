@@ -3,11 +3,8 @@
 #include <string>
 
 #include "binary_util.hpp"
-#include <vulkan/vk_enum_string_helper.h>
-
-extern "C" {
 #include "compute_interface.h"
-}
+#include <vulkan/vk_enum_string_helper.h>
 
 #define UNWRAP_VKRESULT(result)                                                \
     do {                                                                       \

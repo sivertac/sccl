@@ -2,6 +2,10 @@
 #ifndef COMPUTE_INTERFACE_HEADER
 #define COMPUTE_INTERFACE_HEADER
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 #include <stdbool.h>
 #include <vulkan/vulkan.h>
 
@@ -82,5 +86,9 @@ VkResult create_compute_buffer(const ComputeDevice *compute_device,
 
 void destroy_compute_buffer(const ComputeDevice *compute_device,
                             ComputeBuffer *compute_buffer);
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif
