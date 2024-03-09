@@ -98,22 +98,31 @@ bool checkValidationLayerSupport() {
     return true;
 }
 
-VkResult createInstance(VkInstance* instance) {
+VkResult createInstance(bool enable_validation_layers, VkInstance* instance) {
     *instance = VK_NULL_HANDLE;
 
-    VkApplicationInfo appInfo = {};
-    appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    appInfo.pApplicationName = "Compute Shader Example";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.pEngineName = "No Engine";
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-    appInfo.apiVersion = VK_API_VERSION_1_0;
+    VkApplicationInfo app_info = {};
+    app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
+    app_info.pApplicationName = "Compute Shader Example";
+    app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    app_info.pEngineName = "No Engine";
+    app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    app_info.apiVersion = VK_API_VERSION_1_0;
 
-    VkInstanceCreateInfo createInfo = {};
-    createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
-    createInfo.pApplicationInfo = &appInfo;
+    VkInstanceCreateInfo create_info = {};
+    create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
+    create_info.pApplicationInfo = &app_info;
+    if (enable_validation_layers) {
+        const char* extention_names[] = {
+            VK_EXT_DEBUG_UTILS_EXTENSION_NAME
+        };
+        create_info.enabledExtensionCount = 1;
+        create_info.ppEnabledExtensionNames = extention_names;
+        create_info.enabledLayerCount = num_validation_layers;
+        create_info.ppEnabledLayerNames = validation_layers;
+    }
 
-    return vkCreateInstance(&createInfo, NULL, instance);
+    return vkCreateInstance(&create_info, NULL, instance);
 }
 
 VkResult pickPhysicalDevice(VkInstance instance, VkPhysicalDevice* physical_device) {
@@ -191,13 +200,13 @@ VkResult createDescriptorSetLayout(VkDevice device, uint32_t num_input_descripto
     return vkCreateDescriptorSetLayout(device, &layoutInfo, NULL, descriptor_set_layout);
 }
 
-VkResult createDescriptorPool(VkDevice device, VkDescriptorPoolSize* descriptor_pool_sizes, uint32_t num_descriptor_pool_sizes, VkDescriptorPool* descriptor_pool) {
+VkResult createDescriptorPool(VkDevice device, VkDescriptorPoolSize* descriptor_pool_sizes, uint32_t num_descriptor_pool_sizes, uint32_t max_sets, VkDescriptorPool* descriptor_pool) {
     
     VkDescriptorPoolCreateInfo poolInfo{};
     poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
     poolInfo.poolSizeCount = num_descriptor_pool_sizes;
     poolInfo.pPoolSizes = descriptor_pool_sizes;
-    poolInfo.maxSets = static_cast<uint32_t>(num_descriptor_pool_sizes);
+    poolInfo.maxSets = max_sets;
 
     return vkCreateDescriptorPool(device, &poolInfo, nullptr, descriptor_pool);
 }
@@ -294,7 +303,7 @@ VkResult createComputeDevice(bool enable_validation_layers, ComputeDevice* compu
     }
 
     // get vulkan instance
-    res = createInstance(&compute_device->m_instance);
+    res = createInstance(enable_validation_layers, &compute_device->m_instance);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -352,11 +361,13 @@ VkResult createComputePipeline(
     }
 
     // create descriptor pool
-    const int num_sets = 1; // only make 1 set for now
-    VkDescriptorPoolSize descriptor_pool_sizes[num_sets] = {}; 
+    const int num_descriptor_types = 2;
+    VkDescriptorPoolSize descriptor_pool_sizes[num_descriptor_types] = {}; 
     descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptor_pool_sizes[0].descriptorCount = static_cast<uint32_t>(num_input_buffers + num_output_buffers);
-    res = createDescriptorPool(compute_device->m_device, descriptor_pool_sizes, num_sets, &compute_pipeline->m_descriptor_pool);
+    descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+    descriptor_pool_sizes[1].descriptorCount = static_cast<uint32_t>(num_input_buffers + num_output_buffers);
+    res = createDescriptorPool(compute_device->m_device, descriptor_pool_sizes, num_descriptor_types, 1, &compute_pipeline->m_descriptor_pool);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -382,27 +393,6 @@ VkResult createComputePipeline(
     return res;
 }
 
-VkResult createComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set) {
-    VkResult res = VK_SUCCESS;
-
-    // zero init
-    *compute_descriptor_set = {};
-
-    // Create descriptor set
-    VkDescriptorSetAllocateInfo allocInfo = {};
-    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
-    allocInfo.descriptorPool = compute_pipeline->m_descriptor_pool;
-    allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
-    allocInfo.pSetLayouts = &compute_pipeline->m_descriptor_set_layout;
-    
-    res = vkAllocateDescriptorSets(compute_device->m_device, &allocInfo, &compute_descriptor_set->m_descriptor_set);
-    if (res != VK_SUCCESS) {
-        return res;
-    }
-
-    return res;
-}
-
 VkResult updateComputeDescriptorSet(
     const ComputeDevice* compute_device, 
     const ComputeBuffer* input_buffers,
@@ -420,6 +410,7 @@ VkResult updateComputeDescriptorSet(
     if (descriptor_writes == NULL) {
         return VK_ERROR_UNKNOWN;
     }
+    memset(descriptor_writes, 0, num_descriptor_writes * sizeof(VkWriteDescriptorSet));
 
     for (size_t i = 0; i < num_input_buffers; ++i) {
         size_t write_index = i;
@@ -506,9 +497,34 @@ VkResult runComputePipelineSync(
 }
 
 void destroyComputePipeline(const ComputeDevice* compute_device, ComputePipeline* compute_pipeline) {
+    vkDestroyDescriptorPool(compute_device->m_device, compute_pipeline->m_descriptor_pool, VK_NULL_HANDLE);
+    vkDestroyDescriptorSetLayout(compute_device->m_device, compute_pipeline->m_descriptor_set_layout, VK_NULL_HANDLE);
     vkDestroyPipeline(compute_device->m_device, compute_pipeline->m_compute_pipeline, NULL);
     vkDestroyPipelineLayout(compute_device->m_device, compute_pipeline->m_pipeline_layout, NULL);
+    vkDestroyShaderModule(compute_device->m_device, compute_pipeline->m_shader_module, VK_NULL_HANDLE);
+    vkFreeCommandBuffers(compute_device->m_device, compute_pipeline->m_command_pool, 1, &compute_pipeline->m_command_buffer);
     vkDestroyCommandPool(compute_device->m_device, compute_pipeline->m_command_pool, NULL);
+}
+
+VkResult createComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set) {
+    VkResult res = VK_SUCCESS;
+
+    // zero init
+    *compute_descriptor_set = {};
+
+    // Create descriptor set
+    VkDescriptorSetAllocateInfo allocInfo = {};
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = compute_pipeline->m_descriptor_pool;
+    allocInfo.descriptorSetCount = static_cast<uint32_t>(1);
+    allocInfo.pSetLayouts = &compute_pipeline->m_descriptor_set_layout;
+    
+    res = vkAllocateDescriptorSets(compute_device->m_device, &allocInfo, &compute_descriptor_set->m_descriptor_set);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+
+    return res;
 }
 
 VkResult createComputeBuffer(const ComputeDevice* compute_device, VkDeviceSize size, ComputeBuffer* compute_buffer) {
@@ -559,8 +575,8 @@ VkResult createComputeBuffer(const ComputeDevice* compute_device, VkDeviceSize s
     return res;
 }
 
-void destroyComputeBuffer(ComputeBuffer* compute_buffer) {
-    //vkFreeMemory(compute_buffer->m_buffer_memory)
-    //vkDestroyBuffer()
+void destroyComputeBuffer(const ComputeDevice* compute_device, ComputeBuffer* compute_buffer) {
+    vkFreeMemory(compute_device->m_device, compute_buffer->m_buffer_memory, VK_NULL_HANDLE);
+    vkDestroyBuffer(compute_device->m_device, compute_buffer->m_buffer, VK_NULL_HANDLE);
 }
 

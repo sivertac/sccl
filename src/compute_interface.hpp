@@ -46,7 +46,6 @@ VkResult createComputePipeline(
     ComputePipeline* compute_pipeline
 );
 
-VkResult createComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set);
 
 VkResult updateComputeDescriptorSet(
     const ComputeDevice* compute_device, 
@@ -66,11 +65,18 @@ VkResult runComputePipelineSync(
     const uint32_t group_count_z
 );
 
-void destroyComputePipeline(ComputePipeline* compute_pipeline);
+void destroyComputePipeline(const ComputeDevice* compute_device, ComputePipeline* compute_pipeline);
+
+/**
+ * Doesn't need to be destroyed as descriptor sets are maintained by the descriptor set pool.
+*/
+VkResult createComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set);
+
+void destroyComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set);
 
 VkResult createComputeBuffer(const ComputeDevice* compute_device, VkDeviceSize size, ComputeBuffer* compute_buffer);
 
-void destroyComputeBuffer(ComputeBuffer* compute_buffer);
+void destroyComputeBuffer(const ComputeDevice* compute_device, ComputeBuffer* compute_buffer);
 
 
 #endif

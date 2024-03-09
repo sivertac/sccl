@@ -112,6 +112,10 @@ int main(int argc, char** argv) {
     runComputePipelineSync(&compute_device, &compute_pipeline, &compute_descriptor_set, size, 1, 1);
     printDataBuffers(&compute_device, size, input_buffer.m_buffer_memory, output_buffer.m_buffer_memory);
 
+    // cleanup
+    destroyComputeBuffer(&compute_device, &input_buffer);
+    destroyComputeBuffer(&compute_device, &output_buffer);
+    destroyComputePipeline(&compute_device, &compute_pipeline);
     destroyComputeDevice(&compute_device);
 
     return EXIT_SUCCESS;
