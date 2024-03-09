@@ -1,4 +1,7 @@
-#version 450
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+#include "common.comp"
 
 layout(set = 0, binding = 0) buffer InputBuffer {
     int inputData[];
@@ -11,5 +14,5 @@ layout(set = 0, binding = 1) buffer OutputBuffer {
 void main() {
     uint idx = gl_GlobalInvocationID.x;
     outputData[idx] = inputData[idx] / 2;
-    outputData[idx] = 1;
+    outputData[idx] = asd();
 }
