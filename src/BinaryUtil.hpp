@@ -3,8 +3,8 @@
 
 #include <istream>
 
-void printStreamBinaryXxd(std::istream &input);
+void print_stream_binary_xxd(std::istream &input);
 
-void printBufferBinaryXxd(const char *buffer, size_t size);
+void print_buffer_binary_xxd(const char *buffer, size_t size);
 
 #endif

@@ -33,50 +33,51 @@ struct ComputeBuffer {
     VkDeviceSize m_size;
 };
 
-VkResult createComputeDevice(bool enable_validation_layers, ComputeDevice* compute_device);
+VkResult create_compute_device(bool enable_validation_layers,
+                             ComputeDevice *compute_device);
 
-void destroyComputeDevice(ComputeDevice* compute_device);
+void destroy_compute_device(ComputeDevice *compute_device);
 
-VkResult createComputePipeline(
-    const ComputeDevice* compute_device, 
-    const char* shader_source, 
-    const size_t shader_source_size, 
-    const int num_input_buffers, 
-    const int num_output_buffers, 
-    ComputePipeline* compute_pipeline
-);
+VkResult create_compute_pipeline(const ComputeDevice *compute_device,
+                               const char *shader_source,
+                               const size_t shader_source_size,
+                               const int num_input_buffers,
+                               const int num_output_buffers,
+                               ComputePipeline *compute_pipeline);
 
+VkResult update_compute_descriptor_set(
+    const ComputeDevice *compute_device, const ComputeBuffer *input_buffers,
+    const int num_input_buffers, const ComputeBuffer *output_buffers,
+    const int num_output_buffers, ComputeDescriptorSet *compute_descriptor_set);
 
-VkResult updateComputeDescriptorSet(
-    const ComputeDevice* compute_device, 
-    const ComputeBuffer* input_buffers,
-    const int num_input_buffers,
-    const ComputeBuffer* output_buffers,
-    const int num_output_buffers,    
-    ComputeDescriptorSet* compute_descriptor_set
-);
+VkResult
+run_compute_pipeline_sync(const ComputeDevice *compute_device,
+                       const ComputePipeline *compute_pipeline,
+                       const ComputeDescriptorSet *compute_descriptor_set,
+                       const uint32_t group_count_x,
+                       const uint32_t group_count_y,
+                       const uint32_t group_count_z);
 
-VkResult runComputePipelineSync(
-    const ComputeDevice* compute_device,
-    const ComputePipeline* compute_pipeline,
-    const ComputeDescriptorSet* compute_descriptor_set,
-    const uint32_t group_count_x,
-    const uint32_t group_count_y,
-    const uint32_t group_count_z
-);
-
-void destroyComputePipeline(const ComputeDevice* compute_device, ComputePipeline* compute_pipeline);
+void destroy_compute_pipeline(const ComputeDevice *compute_device,
+                            ComputePipeline *compute_pipeline);
 
 /**
- * Doesn't need to be destroyed as descriptor sets are maintained by the descriptor set pool.
-*/
-VkResult createComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set);
+ * Doesn't need to be destroyed as descriptor sets are maintained by the
+ * descriptor set pool.
+ */
+VkResult
+create_compute_descriptor_set(const ComputeDevice *compute_device,
+                           const ComputePipeline *compute_pipeline,
+                           ComputeDescriptorSet *compute_descriptor_set);
 
-void destroyComputeDescriptorSet(const ComputeDevice* compute_device, const ComputePipeline* compute_pipeline, ComputeDescriptorSet* compute_descriptor_set);
+void destroy_compute_descriptor_set(const ComputeDevice *compute_device,
+                                 const ComputePipeline *compute_pipeline,
+                                 ComputeDescriptorSet *compute_descriptor_set);
 
-VkResult createComputeBuffer(const ComputeDevice* compute_device, VkDeviceSize size, ComputeBuffer* compute_buffer);
+VkResult create_compute_buffer(const ComputeDevice *compute_device,
+                             VkDeviceSize size, ComputeBuffer *compute_buffer);
 
-void destroyComputeBuffer(const ComputeDevice* compute_device, ComputeBuffer* compute_buffer);
-
+void destroy_compute_buffer(const ComputeDevice *compute_device,
+                          ComputeBuffer *compute_buffer);
 
 #endif

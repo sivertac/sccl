@@ -7,7 +7,8 @@
 #include <string>
 #include <vector>
 
-void printStreamBinaryXxd(std::istream &input) {
+void print_stream_binary_xxd(std::istream &input)
+{
     const int bufferSize = 16;
     char buffer[bufferSize];
 
@@ -53,7 +54,8 @@ void printStreamBinaryXxd(std::istream &input) {
     }
 }
 
-void printBufferBinaryXxd(const char *buffer, size_t size) {
+void print_buffer_binary_xxd(const char *buffer, size_t size)
+{
     std::istringstream input(std::string(buffer, size));
-    printStreamBinaryXxd(input);
+    print_stream_binary_xxd(input);
 }

@@ -6,6 +6,8 @@ find_package(Vulkan REQUIRED)
 find_package(glm REQUIRED)
 find_package(glfw3 3.3.2 REQUIRED)
 
+# clang-tidy
+set(CMAKE_CXX_CLANG_TIDY "clang-tidy;-config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
 
 add_executable(compute-shader-test)
 

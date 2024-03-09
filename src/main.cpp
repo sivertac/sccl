@@ -1,80 +1,89 @@
 #include <iostream>
-#include <string>
 #include <optional>
+#include <string>
 
+#include "BinaryUtil.hpp"
 #include "compute_interface.hpp"
 #include <vulkan/vk_enum_string_helper.h>
-#include "BinaryUtil.hpp"
 
-void printDataBuffers(const ComputeDevice* compute_device, size_t num_elements, VkDeviceMemory input_buffer_memory, VkDeviceMemory output_buffer_memory) {
+void print_data_buffers(const ComputeDevice *compute_device, size_t num_elements,
+                      VkDeviceMemory input_buffer_memory,
+                      VkDeviceMemory output_buffer_memory)
+{
     VkDeviceSize buffer_size = sizeof(int) * num_elements;
-    
-    // Map and fill the buffers
-    void* inputDataPtr;
-    void* outputDataPtr;
 
-    vkMapMemory(compute_device->m_device, input_buffer_memory, 0, buffer_size, 0, &inputDataPtr);
-    vkMapMemory(compute_device->m_device, output_buffer_memory, 0, buffer_size, 0, &outputDataPtr);
+    // Map and fill the buffers
+    void *inputDataPtr;
+    void *outputDataPtr;
+
+    vkMapMemory(compute_device->m_device, input_buffer_memory, 0, buffer_size,
+                0, &inputDataPtr);
+    vkMapMemory(compute_device->m_device, output_buffer_memory, 0, buffer_size,
+                0, &outputDataPtr);
 
     // Print inputDataPtr and outputDataPtr
     std::cout << "Input buffer:" << std::endl;
-    printBufferBinaryXxd((const char*)inputDataPtr, buffer_size);
+    print_buffer_binary_xxd((const char *)inputDataPtr, buffer_size);
 
     std::cout << "Output buffer:" << std::endl;
-    printBufferBinaryXxd((const char*)outputDataPtr, buffer_size);
-
+    print_buffer_binary_xxd((const char *)outputDataPtr, buffer_size);
 
     vkUnmapMemory(compute_device->m_device, input_buffer_memory);
     vkUnmapMemory(compute_device->m_device, output_buffer_memory);
 }
 
-std::optional<std::string> readFile(const char* filepath) {
+std::optional<std::string> read_file(const char *filepath)
+{
     // Read the shader code from the file
-    FILE* file = fopen(filepath, "rb");
+    FILE *file = fopen(filepath, "rb");
     if (!file) {
-        std::nullopt;
+        return std::nullopt;
     }
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
     rewind(file);
-    char* data = (char*)malloc(size);
+    char *data = (char *)malloc(size);
     fread(data, 1, size, file);
     fclose(file);
 
     std::string ret(data, size);
     free(data);
-    
+
     return ret;
 }
 
-const char* COMPUTE_SHADER_PATH = "shaders/test_compute_shader.spv";
+const char *COMPUTE_SHADER_PATH = "shaders/test_compute_shader.spv";
 
-int main(int argc, char** argv) {
+int main(int argc, char **argv)
+{
+    (void)argc;
+    (void)argv;
 
     ComputeDevice compute_device = {};
     VkResult res = VK_SUCCESS;
-    res = createComputeDevice(true, &compute_device);
+    res = create_compute_device(true, &compute_device);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
         exit(EXIT_FAILURE);
     }
 
     // read shader
-    auto shader_source = readFile(COMPUTE_SHADER_PATH);
+    auto shader_source = read_file(COMPUTE_SHADER_PATH);
     if (!shader_source.has_value()) {
-        fprintf(stderr, "Failed to open shader file: %s\n", COMPUTE_SHADER_PATH);
+        fprintf(stderr, "Failed to open shader file: %s\n",
+                COMPUTE_SHADER_PATH);
         exit(EXIT_FAILURE);
     }
 
     // create buffers
     ComputeBuffer input_buffer;
-    res = createComputeBuffer(&compute_device, 1000, &input_buffer);
+    res = create_compute_buffer(&compute_device, 1000, &input_buffer);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
         exit(EXIT_FAILURE);
     }
     ComputeBuffer output_buffer;
-    res = createComputeBuffer(&compute_device, 1000, &output_buffer);
+    res = create_compute_buffer(&compute_device, 1000, &output_buffer);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
         exit(EXIT_FAILURE);
@@ -82,14 +91,9 @@ int main(int argc, char** argv) {
 
     // create compute pipeline
     ComputePipeline compute_pipeline;
-    res = createComputePipeline(
-        &compute_device, 
-        shader_source.value().data(), 
-        shader_source.value().size(), 
-        1, 
-        1, 
-        &compute_pipeline
-    );
+    res = create_compute_pipeline(&compute_device, shader_source.value().data(),
+                                shader_source.value().size(), 1, 1,
+                                &compute_pipeline);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
         exit(EXIT_FAILURE);
@@ -97,26 +101,34 @@ int main(int argc, char** argv) {
 
     // create descriptor set
     ComputeDescriptorSet compute_descriptor_set;
-    res = createComputeDescriptorSet(&compute_device, &compute_pipeline, &compute_descriptor_set);
+    res = create_compute_descriptor_set(&compute_device, &compute_pipeline,
+                                     &compute_descriptor_set);
     if (res != VK_SUCCESS) {
         fprintf(stderr, "Vulkan error: %s\n", string_VkResult(res));
         exit(EXIT_FAILURE);
     }
 
     // update descriptor set
-    res = updateComputeDescriptorSet(&compute_device, &input_buffer, 1, &output_buffer, 1, &compute_descriptor_set);
+    res =
+        update_compute_descriptor_set(&compute_device, &input_buffer, 1,
+                                   &output_buffer, 1, &compute_descriptor_set);
 
     // run compute
     uint32_t size = 10;
-    printDataBuffers(&compute_device, size, input_buffer.m_buffer_memory, output_buffer.m_buffer_memory);
-    runComputePipelineSync(&compute_device, &compute_pipeline, &compute_descriptor_set, size, 1, 1);
-    printDataBuffers(&compute_device, size, input_buffer.m_buffer_memory, output_buffer.m_buffer_memory);
+    print_data_buffers(&compute_device, size, input_buffer.m_buffer_memory,
+                     output_buffer.m_buffer_memory);
+    run_compute_pipeline_sync(&compute_device, &compute_pipeline,
+                           &compute_descriptor_set, size, 1, 1);
+    print_data_buffers(&compute_device, size, input_buffer.m_buffer_memory,
+                     output_buffer.m_buffer_memory);
 
     // cleanup
-    destroyComputeBuffer(&compute_device, &input_buffer);
-    destroyComputeBuffer(&compute_device, &output_buffer);
-    destroyComputePipeline(&compute_device, &compute_pipeline);
-    destroyComputeDevice(&compute_device);
+    destroy_compute_buffer(&compute_device, &input_buffer);
+    destroy_compute_buffer(&compute_device, &output_buffer);
+    destroy_compute_pipeline(&compute_device, &compute_pipeline);
+    destroy_compute_device(&compute_device);
+
+    (void)res;
 
     return EXIT_SUCCESS;
 }
@@ -124,12 +136,12 @@ int main(int argc, char** argv) {
 #if 0
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
-#include <vulkan/vulkan.h>
+#include <array>
+#include <iostream>
 #include <stdio.h>
 #include <stdlib.h>
-#include <array>
 #include <vector>
-#include <iostream>
+#include <vulkan/vulkan.h>
 
 #include "BinaryUtil.hpp"
 
