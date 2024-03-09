@@ -2,7 +2,7 @@
 #include <optional>
 #include <string>
 
-#include "BinaryUtil.hpp"
+#include "binary_util.hpp"
 #include "compute_interface.hpp"
 #include <vulkan/vk_enum_string_helper.h>
 
@@ -143,7 +143,7 @@ int main(int argc, char **argv)
 #include <vector>
 #include <vulkan/vulkan.h>
 
-#include "BinaryUtil.hpp"
+#include "binary_util.hpp"
 
 const uint32_t WIDTH = 800;
 const uint32_t HEIGHT = 600;

@@ -1,5 +1,5 @@
 #pragma once
-#ifndef BinaryUtil_HEADER
+#ifndef BINARY_UTIL_HEADER
 
 #include <istream>
 
