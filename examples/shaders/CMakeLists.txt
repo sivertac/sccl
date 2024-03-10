@@ -15,8 +15,8 @@ function(compile_shader target source output)
 endfunction()
 
 compile_shader(
-    compile_compute_shader
-    ${CMAKE_CURRENT_SOURCE_DIR}/test_compute_shader.comp
-    ${CMAKE_CURRENT_BINARY_DIR}/test_compute_shader.spv
+    compute_basic_shader
+    ${CMAKE_CURRENT_SOURCE_DIR}/compute_basic_shader.comp
+    ${CMAKE_CURRENT_BINARY_DIR}/compute_basic_shader.spv
 )
 

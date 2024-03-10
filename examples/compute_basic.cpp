@@ -60,7 +60,7 @@ std::optional<std::string> read_file(const char *filepath)
     return ret;
 }
 
-const char *COMPUTE_SHADER_PATH = "shaders/test_compute_shader.spv";
+const char *COMPUTE_SHADER_PATH = "shaders/compute_basic_shader.spv";
 
 int main(int argc, char **argv)
 {
