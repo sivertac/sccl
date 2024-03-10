@@ -853,3 +853,22 @@ VkResult write_to_compute_buffer(const ComputeDevice *compute_device,
 
     return res;
 }
+
+VkResult read_from_compute_buffer(const ComputeDevice *compute_device,
+                                  const ComputeBuffer *compute_buffer,
+                                  VkDeviceSize offset, VkDeviceSize size,
+                                  void *data)
+{
+    VkResult res = VK_SUCCESS;
+    void *ptr;
+
+    res = vkMapMemory(compute_device->m_device, compute_buffer->m_buffer_memory,
+                      offset, size, 0, &ptr);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    memcpy(data, ptr, size);
+    vkUnmapMemory(compute_device->m_device, compute_buffer->m_buffer_memory);
+
+    return res;
+}

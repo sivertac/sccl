@@ -102,6 +102,11 @@ VkResult write_to_compute_buffer(const ComputeDevice *compute_device,
                                  VkDeviceSize offset, VkDeviceSize size,
                                  const void *data);
 
+VkResult read_from_compute_buffer(const ComputeDevice *compute_device,
+                                  const ComputeBuffer *compute_buffer,
+                                  VkDeviceSize offset, VkDeviceSize size,
+                                  void *data);
+
 #ifdef __cplusplus
 }
 #endif
