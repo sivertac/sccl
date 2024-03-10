@@ -197,31 +197,35 @@ static VkResult create_shader_module(VkDevice device, const char *shader_source,
 }
 
 static VkResult
-create_descriptor_set_layout(VkDevice device, uint32_t num_input_descriptors,
-                             uint32_t num_output_descriptors,
-                             VkDescriptorSetLayout *descriptor_set_layout)
+create_descriptor_set_layout(VkDevice device, uint32_t num_bindings,
+                             VkDescriptorSetLayout *descriptor_set_layout,
+                             VkDescriptorType type)
 {
-    VkDescriptorSetLayoutBinding inputBinding = {};
-    inputBinding.binding = 0;
-    inputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    inputBinding.descriptorCount = num_input_descriptors;
-    inputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 
-    VkDescriptorSetLayoutBinding outputBinding = {};
-    outputBinding.binding = 1;
-    outputBinding.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    outputBinding.descriptorCount = num_output_descriptors;
-    outputBinding.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    VkDescriptorSetLayoutBinding *bindings = NULL;
+    bindings = malloc(sizeof(VkDescriptorSetLayoutBinding) * num_bindings);
+    if (bindings == NULL) {
+        return VK_ERROR_UNKNOWN;
+    }
+    memset(bindings, 0, sizeof(VkDescriptorSetLayoutBinding) * num_bindings);
 
-    VkDescriptorSetLayoutBinding bindings[] = {inputBinding, outputBinding};
+    for (size_t i = 0; i < num_bindings; ++i) {
+        VkDescriptorSetLayoutBinding *inputBinding = &bindings[i];
+        inputBinding->binding = i;
+        inputBinding->descriptorType = type;
+        inputBinding->descriptorCount = 1;
+        inputBinding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
 
     VkDescriptorSetLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 2; // Number of bindings
+    layoutInfo.bindingCount = num_bindings;
     layoutInfo.pBindings = bindings;
 
-    return vkCreateDescriptorSetLayout(device, &layoutInfo, NULL,
-                                       descriptor_set_layout);
+    VkResult res = vkCreateDescriptorSetLayout(device, &layoutInfo, NULL,
+                                               descriptor_set_layout);
+    free(bindings);
+    return res;
 }
 
 static VkResult
@@ -242,17 +246,16 @@ create_descriptor_pool(VkDevice device,
 }
 
 static VkResult create_compute_pipeline_impl(
-    VkDevice device, VkDescriptorSetLayout descriptor_set_layout,
-    VkShaderModule shader_module, VkPipelineLayout *pipeline_layout,
-    VkPipeline *compute_pipeline)
+    VkDevice device, VkDescriptorSetLayout *descriptor_set_layouts,
+    uint32_t num_descriptor_set_layouts, VkShaderModule shader_module,
+    VkPipelineLayout *pipeline_layout, VkPipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
 
     VkPipelineLayoutCreateInfo layoutInfo = {};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    layoutInfo.setLayoutCount = 1;
-    layoutInfo.pSetLayouts =
-        &descriptor_set_layout; // Use the descriptor set layout you created
+    layoutInfo.setLayoutCount = num_descriptor_set_layouts;
+    layoutInfo.pSetLayouts = descriptor_set_layouts;
 
     res = vkCreatePipelineLayout(device, &layoutInfo, NULL, pipeline_layout);
     if (res != VK_SUCCESS) {
@@ -396,6 +399,7 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
                                  const size_t shader_source_size,
                                  const int num_input_buffers,
                                  const int num_output_buffers,
+                                 const int num_uniform_buffers,
                                  ComputePipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
@@ -408,13 +412,39 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
         compute_device->m_device, 0, 0,
         &compute_pipeline->m_queue); // Queue family index 0, queue index 0
 
-    // create descriptor set layout
+    // create descriptor set layouts
     res = create_descriptor_set_layout(
-        compute_device->m_device, num_input_buffers, num_output_buffers,
-        &compute_pipeline->m_descriptor_set_layout);
+        compute_device->m_device, num_input_buffers,
+        &compute_pipeline->m_input_descriptor_set_layout,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
     if (res != VK_SUCCESS) {
         return res;
     }
+    compute_pipeline->m_num_input_bindings = num_input_buffers;
+
+    res = create_descriptor_set_layout(
+        compute_device->m_device, num_output_buffers,
+        &compute_pipeline->m_output_descriptor_set_layout,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    compute_pipeline->m_num_output_bindings = num_output_buffers;
+
+    res = create_descriptor_set_layout(
+        compute_device->m_device, num_uniform_buffers,
+        &compute_pipeline->m_uniform_descriptor_set_layout,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    compute_pipeline->m_num_uniform_bindings = num_uniform_buffers;
+
+    const uint32_t num_descriptor_set_layouts = 3;
+    VkDescriptorSetLayout descriptor_set_layouts[] = {
+        compute_pipeline->m_input_descriptor_set_layout,
+        compute_pipeline->m_output_descriptor_set_layout,
+        compute_pipeline->m_uniform_descriptor_set_layout};
 
     // create descriptor pool
     const int num_descriptor_types = 2;
@@ -423,13 +453,15 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
            sizeof(VkDescriptorPoolSize) * num_descriptor_types);
     descriptor_pool_sizes[0].type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     descriptor_pool_sizes[0].descriptorCount =
-        (uint32_t)(num_input_buffers + num_output_buffers);
+        (uint32_t)(num_input_buffers + num_output_buffers +
+                   num_uniform_buffers);
     descriptor_pool_sizes[1].type = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
     descriptor_pool_sizes[1].descriptorCount =
-        (uint32_t)(num_input_buffers + num_output_buffers);
-    res = create_descriptor_pool(compute_device->m_device,
-                                 descriptor_pool_sizes, num_descriptor_types, 1,
-                                 &compute_pipeline->m_descriptor_pool);
+        (uint32_t)(num_input_buffers + num_output_buffers +
+                   num_uniform_buffers);
+    res = create_descriptor_pool(
+        compute_device->m_device, descriptor_pool_sizes, num_descriptor_types,
+        num_descriptor_set_layouts, &compute_pipeline->m_descriptor_pool);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -444,8 +476,9 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
 
     // create compute pipeline
     res = create_compute_pipeline_impl(
-        compute_device->m_device, compute_pipeline->m_descriptor_set_layout,
-        compute_pipeline->m_shader_module, &compute_pipeline->m_pipeline_layout,
+        compute_device->m_device, descriptor_set_layouts,
+        num_descriptor_set_layouts, compute_pipeline->m_shader_module,
+        &compute_pipeline->m_pipeline_layout,
         &compute_pipeline->m_compute_pipeline);
     if (res != VK_SUCCESS) {
         return res;
@@ -462,16 +495,17 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
     return res;
 }
 
-VkResult update_compute_descriptor_set(
-    const ComputeDevice *compute_device, const ComputeBuffer *input_buffers,
-    const int num_input_buffers, const ComputeBuffer *output_buffers,
-    const int num_output_buffers, ComputeDescriptorSet *compute_descriptor_set)
+static VkResult update_descriptor_set(VkDevice device,
+                                      VkDescriptorSet descriptor_set,
+                                      VkDescriptorType descriptor_type,
+                                      uint32_t num_bindings, VkBuffer *buffers,
+                                      VkDeviceSize *buffer_sizes)
 {
     VkResult res = VK_SUCCESS;
 
-    // Update descriptor sets
+    // Update input descriptor sets
     VkWriteDescriptorSet *descriptor_writes = NULL;
-    size_t num_descriptor_writes = num_input_buffers + num_output_buffers;
+    size_t num_descriptor_writes = num_bindings;
     descriptor_writes = (VkWriteDescriptorSet *)malloc(
         num_descriptor_writes * sizeof(VkWriteDescriptorSet));
     if (descriptor_writes == NULL) {
@@ -480,49 +514,101 @@ VkResult update_compute_descriptor_set(
     memset(descriptor_writes, 0,
            num_descriptor_writes * sizeof(VkWriteDescriptorSet));
 
-    for (int i = 0; i < num_input_buffers; ++i) {
+    for (uint32_t i = 0; i < num_bindings; ++i) {
         size_t write_index = i;
 
         VkDescriptorBufferInfo buffer_info = {};
-        buffer_info.buffer = input_buffers[i].m_buffer;
+        buffer_info.buffer = buffers[i];
         buffer_info.offset = 0;
-        buffer_info.range = input_buffers[i].m_size;
+        buffer_info.range = buffer_sizes[i];
 
         descriptor_writes[write_index].sType =
             VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[write_index].dstSet =
-            compute_descriptor_set->m_descriptor_set;
+        descriptor_writes[write_index].dstSet = descriptor_set;
         descriptor_writes[write_index].dstBinding = write_index;
         descriptor_writes[write_index].dstArrayElement = 0;
-        descriptor_writes[write_index].descriptorType =
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-        descriptor_writes[write_index].descriptorCount = 1;
-        descriptor_writes[write_index].pBufferInfo = &buffer_info;
-    }
-    for (int i = 0; i < num_output_buffers; ++i) {
-        size_t write_index = i + num_input_buffers;
-
-        VkDescriptorBufferInfo buffer_info = {};
-        buffer_info.buffer = output_buffers[i].m_buffer;
-        buffer_info.offset = 0;
-        buffer_info.range = output_buffers[i].m_size;
-
-        descriptor_writes[write_index].sType =
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[write_index].dstSet =
-            compute_descriptor_set->m_descriptor_set;
-        descriptor_writes[write_index].dstBinding = write_index;
-        descriptor_writes[write_index].dstArrayElement = 0;
-        descriptor_writes[write_index].descriptorType =
-            VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
+        descriptor_writes[write_index].descriptorType = descriptor_type;
         descriptor_writes[write_index].descriptorCount = 1;
         descriptor_writes[write_index].pBufferInfo = &buffer_info;
     }
 
-    vkUpdateDescriptorSets(compute_device->m_device, num_descriptor_writes,
-                           descriptor_writes, 0, NULL);
+    vkUpdateDescriptorSets(device, num_descriptor_writes, descriptor_writes, 0,
+                           NULL);
 
     free(descriptor_writes);
+
+    return res;
+}
+
+VkResult update_compute_descriptor_sets(
+    const ComputeDevice *compute_device,
+    const ComputePipeline *compute_pipeline, const ComputeBuffer *input_buffers,
+    const ComputeBuffer *output_buffers, const ComputeBuffer *uniform_buffers,
+    ComputeDescriptorSets *compute_descriptor_sets)
+{
+
+    VkResult res = VK_SUCCESS;
+    VkBuffer *buffers;
+    VkDeviceSize *buffer_sizes;
+
+    // Update input descriptor sets
+    buffers = malloc(sizeof(VkBuffer) * compute_pipeline->m_num_input_bindings);
+    buffer_sizes =
+        malloc(sizeof(VkDeviceSize) * compute_pipeline->m_num_input_bindings);
+    for (size_t i = 0; i < compute_pipeline->m_num_input_bindings; ++i) {
+        buffers[i] = input_buffers->m_buffer;
+        buffer_sizes[i] = input_buffers->m_size;
+    }
+    res = update_descriptor_set(compute_device->m_device,
+                                compute_descriptor_sets->m_input_descriptor_set,
+                                VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+                                compute_pipeline->m_num_input_bindings, buffers,
+                                buffer_sizes);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    free(buffers);
+    free(buffer_sizes);
+
+    // Update output descriptor sets
+    buffers =
+        malloc(sizeof(VkBuffer) * compute_pipeline->m_num_output_bindings);
+    buffer_sizes =
+        malloc(sizeof(VkDeviceSize) * compute_pipeline->m_num_output_bindings);
+    for (size_t i = 0; i < compute_pipeline->m_num_output_bindings; ++i) {
+        buffers[i] = output_buffers->m_buffer;
+        buffer_sizes[i] = output_buffers->m_size;
+    }
+    res = update_descriptor_set(
+        compute_device->m_device,
+        compute_descriptor_sets->m_output_descriptor_set,
+        VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+        compute_pipeline->m_num_output_bindings, buffers, buffer_sizes);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    free(buffers);
+    free(buffer_sizes);
+
+    // Update uniform descriptor sets
+    buffers =
+        malloc(sizeof(VkBuffer) * compute_pipeline->m_num_uniform_bindings);
+    buffer_sizes =
+        malloc(sizeof(VkDeviceSize) * compute_pipeline->m_num_uniform_bindings);
+    for (size_t i = 0; i < compute_pipeline->m_num_uniform_bindings; ++i) {
+        buffers[i] = uniform_buffers->m_buffer;
+        buffer_sizes[i] = uniform_buffers->m_size;
+    }
+    res = update_descriptor_set(
+        compute_device->m_device,
+        compute_descriptor_sets->m_uniform_descriptor_set,
+        VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
+        compute_pipeline->m_num_uniform_bindings, buffers, buffer_sizes);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    free(buffers);
+    free(buffer_sizes);
 
     return res;
 }
@@ -530,7 +616,7 @@ VkResult update_compute_descriptor_set(
 VkResult
 run_compute_pipeline_sync(const ComputeDevice *compute_device,
                           const ComputePipeline *compute_pipeline,
-                          const ComputeDescriptorSet *compute_descriptor_set,
+                          const ComputeDescriptorSets *compute_descriptor_sets,
                           const uint32_t group_count_x,
                           const uint32_t group_count_y,
                           const uint32_t group_count_z)
@@ -552,10 +638,27 @@ run_compute_pipeline_sync(const ComputeDevice *compute_device,
                       compute_pipeline->m_compute_pipeline);
 
     // Bind descriptor sets
+    VkDescriptorSet descriptor_sets[3];
+    uint32_t num_descriptor_sets = 0;
+    if (compute_pipeline->m_num_input_bindings > 0) {
+        descriptor_sets[num_descriptor_sets] =
+            compute_descriptor_sets->m_input_descriptor_set;
+        ++num_descriptor_sets;
+    }
+    if (compute_pipeline->m_num_output_bindings > 0) {
+        descriptor_sets[num_descriptor_sets] =
+            compute_descriptor_sets->m_output_descriptor_set;
+        ++num_descriptor_sets;
+    }
+    if (compute_pipeline->m_num_uniform_bindings > 0) {
+        descriptor_sets[num_descriptor_sets] =
+            compute_descriptor_sets->m_uniform_descriptor_set;
+        ++num_descriptor_sets;
+    }
     vkCmdBindDescriptorSets(compute_pipeline->m_command_buffer,
                             VK_PIPELINE_BIND_POINT_COMPUTE,
-                            compute_pipeline->m_pipeline_layout, 0, 1,
-                            &compute_descriptor_set->m_descriptor_set, 0, NULL);
+                            compute_pipeline->m_pipeline_layout, 0,
+                            num_descriptor_sets, descriptor_sets, 0, NULL);
 
     // Dispatch the compute shader
     vkCmdDispatch(compute_pipeline->m_command_buffer, group_count_x,
@@ -586,9 +689,15 @@ void destroy_compute_pipeline(const ComputeDevice *compute_device,
     vkDestroyDescriptorPool(compute_device->m_device,
                             compute_pipeline->m_descriptor_pool,
                             VK_NULL_HANDLE);
-    vkDestroyDescriptorSetLayout(compute_device->m_device,
-                                 compute_pipeline->m_descriptor_set_layout,
-                                 VK_NULL_HANDLE);
+    vkDestroyDescriptorSetLayout(
+        compute_device->m_device,
+        compute_pipeline->m_input_descriptor_set_layout, VK_NULL_HANDLE);
+    vkDestroyDescriptorSetLayout(
+        compute_device->m_device,
+        compute_pipeline->m_output_descriptor_set_layout, VK_NULL_HANDLE);
+    vkDestroyDescriptorSetLayout(
+        compute_device->m_device,
+        compute_pipeline->m_uniform_descriptor_set_layout, VK_NULL_HANDLE);
     vkDestroyPipeline(compute_device->m_device,
                       compute_pipeline->m_compute_pipeline, NULL);
     vkDestroyPipelineLayout(compute_device->m_device,
@@ -603,24 +712,52 @@ void destroy_compute_pipeline(const ComputeDevice *compute_device,
 }
 
 VkResult
-create_compute_descriptor_set(const ComputeDevice *compute_device,
-                              const ComputePipeline *compute_pipeline,
-                              ComputeDescriptorSet *compute_descriptor_set)
+create_compute_descriptor_sets(const ComputeDevice *compute_device,
+                               const ComputePipeline *compute_pipeline,
+                               ComputeDescriptorSets *compute_descriptor_sets)
 {
     VkResult res = VK_SUCCESS;
 
     // zero init
-    memset(compute_descriptor_set, 0, sizeof(ComputeDescriptorSet));
+    memset(compute_descriptor_sets, 0, sizeof(ComputeDescriptorSets));
 
-    // Create descriptor set
     VkDescriptorSetAllocateInfo allocInfo = {};
+
+    // Create input descriptor set
+    memset(&allocInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
     allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
     allocInfo.descriptorPool = compute_pipeline->m_descriptor_pool;
-    allocInfo.descriptorSetCount = (uint32_t)1;
-    allocInfo.pSetLayouts = &compute_pipeline->m_descriptor_set_layout;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &compute_pipeline->m_input_descriptor_set_layout;
+    res = vkAllocateDescriptorSets(
+        compute_device->m_device, &allocInfo,
+        &compute_descriptor_sets->m_input_descriptor_set);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
 
-    res = vkAllocateDescriptorSets(compute_device->m_device, &allocInfo,
-                                   &compute_descriptor_set->m_descriptor_set);
+    // Create output descriptor set
+    memset(&allocInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = compute_pipeline->m_descriptor_pool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &compute_pipeline->m_output_descriptor_set_layout;
+    res = vkAllocateDescriptorSets(
+        compute_device->m_device, &allocInfo,
+        &compute_descriptor_sets->m_output_descriptor_set);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+
+    // Create uniform descriptor set
+    memset(&allocInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
+    allocInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocInfo.descriptorPool = compute_pipeline->m_descriptor_pool;
+    allocInfo.descriptorSetCount = 1;
+    allocInfo.pSetLayouts = &compute_pipeline->m_uniform_descriptor_set_layout;
+    res = vkAllocateDescriptorSets(
+        compute_device->m_device, &allocInfo,
+        &compute_descriptor_sets->m_uniform_descriptor_set);
     if (res != VK_SUCCESS) {
         return res;
     }
@@ -629,7 +766,8 @@ create_compute_descriptor_set(const ComputeDevice *compute_device,
 }
 
 VkResult create_compute_buffer(const ComputeDevice *compute_device,
-                               VkDeviceSize size, ComputeBuffer *compute_buffer)
+                               VkDeviceSize size, ComputeBuffer *compute_buffer,
+                               VkBufferUsageFlagBits usage)
 {
     VkResult res = VK_SUCCESS;
 
@@ -641,7 +779,7 @@ VkResult create_compute_buffer(const ComputeDevice *compute_device,
     memset(&buffer_info, 0, sizeof(VkBufferCreateInfo));
     buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
     buffer_info.size = size;
-    buffer_info.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    buffer_info.usage = usage;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     res = vkCreateBuffer(compute_device->m_device, &buffer_info, NULL,
                          &compute_buffer->m_buffer);
@@ -695,4 +833,23 @@ void destroy_compute_buffer(const ComputeDevice *compute_device,
                  VK_NULL_HANDLE);
     vkDestroyBuffer(compute_device->m_device, compute_buffer->m_buffer,
                     VK_NULL_HANDLE);
+}
+
+VkResult write_to_compute_buffer(const ComputeDevice *compute_device,
+                                 const ComputeBuffer *compute_buffer,
+                                 VkDeviceSize offset, VkDeviceSize size,
+                                 const void *data)
+{
+    VkResult res = VK_SUCCESS;
+    void *ptr;
+
+    res = vkMapMemory(compute_device->m_device, compute_buffer->m_buffer_memory,
+                      offset, size, 0, &ptr);
+    if (res != VK_SUCCESS) {
+        return res;
+    }
+    memcpy(ptr, data, size);
+    vkUnmapMemory(compute_device->m_device, compute_buffer->m_buffer_memory);
+
+    return res;
 }

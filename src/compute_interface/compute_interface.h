@@ -19,7 +19,12 @@ typedef struct ComputeDevice {
 
 typedef struct ComputePipeline {
     VkQueue m_queue;
-    VkDescriptorSetLayout m_descriptor_set_layout;
+    VkDescriptorSetLayout m_input_descriptor_set_layout;
+    uint32_t m_num_input_bindings;
+    VkDescriptorSetLayout m_output_descriptor_set_layout;
+    uint32_t m_num_output_bindings;
+    VkDescriptorSetLayout m_uniform_descriptor_set_layout;
+    uint32_t m_num_uniform_bindings;
     VkDescriptorPool m_descriptor_pool;
     VkShaderModule m_shader_module;
     VkPipelineLayout m_pipeline_layout;
@@ -28,9 +33,11 @@ typedef struct ComputePipeline {
     VkCommandBuffer m_command_buffer;
 } ComputePipeline;
 
-typedef struct ComputeDescriptorSet {
-    VkDescriptorSet m_descriptor_set;
-} ComputeDescriptorSet;
+typedef struct ComputeDescriptorSets {
+    VkDescriptorSet m_input_descriptor_set;
+    VkDescriptorSet m_output_descriptor_set;
+    VkDescriptorSet m_uniform_descriptor_set;
+} ComputeDescriptorSets;
 
 typedef struct ComputeBuffer {
     VkBuffer m_buffer;
@@ -38,6 +45,12 @@ typedef struct ComputeBuffer {
     VkDeviceSize m_size;
 } ComputeBuffer;
 
+/**
+ * @brief Init vulkan structures and store in ComputeDevice.
+ * @param enable_validation_layers Enable validation layers.
+ * @param compute_device
+ * @return `VK_SUCCESS` if ok.
+ */
 VkResult create_compute_device(bool enable_validation_layers,
                                ComputeDevice *compute_device);
 
@@ -48,17 +61,19 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
                                  const size_t shader_source_size,
                                  const int num_input_buffers,
                                  const int num_output_buffers,
+                                 const int num_uniform_buffers,
                                  ComputePipeline *compute_pipeline);
 
-VkResult update_compute_descriptor_set(
-    const ComputeDevice *compute_device, const ComputeBuffer *input_buffers,
-    const int num_input_buffers, const ComputeBuffer *output_buffers,
-    const int num_output_buffers, ComputeDescriptorSet *compute_descriptor_set);
+VkResult update_compute_descriptor_sets(
+    const ComputeDevice *compute_device,
+    const ComputePipeline *compute_pipeline, const ComputeBuffer *input_buffers,
+    const ComputeBuffer *output_buffers, const ComputeBuffer *uniform_buffers,
+    ComputeDescriptorSets *compute_descriptor_sets);
 
 VkResult
 run_compute_pipeline_sync(const ComputeDevice *compute_device,
                           const ComputePipeline *compute_pipeline,
-                          const ComputeDescriptorSet *compute_descriptor_set,
+                          const ComputeDescriptorSets *compute_descriptor_sets,
                           const uint32_t group_count_x,
                           const uint32_t group_count_y,
                           const uint32_t group_count_z);
@@ -71,21 +86,21 @@ void destroy_compute_pipeline(const ComputeDevice *compute_device,
  * descriptor set pool.
  */
 VkResult
-create_compute_descriptor_set(const ComputeDevice *compute_device,
-                              const ComputePipeline *compute_pipeline,
-                              ComputeDescriptorSet *compute_descriptor_set);
-
-void destroy_compute_descriptor_set(
-    const ComputeDevice *compute_device,
-    const ComputePipeline *compute_pipeline,
-    ComputeDescriptorSet *compute_descriptor_set);
+create_compute_descriptor_sets(const ComputeDevice *compute_device,
+                               const ComputePipeline *compute_pipeline,
+                               ComputeDescriptorSets *compute_descriptor_sets);
 
 VkResult create_compute_buffer(const ComputeDevice *compute_device,
-                               VkDeviceSize size,
-                               ComputeBuffer *compute_buffer);
+                               VkDeviceSize size, ComputeBuffer *compute_buffer,
+                               VkBufferUsageFlagBits usage);
 
 void destroy_compute_buffer(const ComputeDevice *compute_device,
                             ComputeBuffer *compute_buffer);
+
+VkResult write_to_compute_buffer(const ComputeDevice *compute_device,
+                                 const ComputeBuffer *compute_buffer,
+                                 VkDeviceSize offset, VkDeviceSize size,
+                                 const void *data);
 
 #ifdef __cplusplus
 }

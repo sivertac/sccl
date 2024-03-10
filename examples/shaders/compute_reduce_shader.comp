@@ -1,0 +1,24 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+layout(set = 0, binding = 0) buffer InputBuffer {
+    int inputData[];
+};
+
+layout(set = 1, binding = 0) buffer OutputBuffer {
+    int outputData[];
+};
+
+layout(set = 2, binding = 0) uniform UniformBufferObject {
+    uint numberOfRanks;
+    uint rankSize;
+} ubo;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+    int sum = 0;
+    for (int rank = 0; rank < ubo.numberOfRanks; ++rank) {
+        sum += inputData[idx + (ubo.rankSize * rank)];
+    }
+    outputData[idx] = sum;
+}
