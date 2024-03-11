@@ -1,6 +1,7 @@
 
 #include "examples_common.hpp"
 
+#include <inttypes.h>
 #include <iostream>
 #include <string>
 #include <vector>
@@ -44,6 +45,8 @@ int main(int argc, char **argv)
         &compute_device, rank_size_bytes * number_of_ranks, &input_buffer,
         VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
     std::vector<int> input_data(rank_size * number_of_ranks);
+
+    // fill input buffer
     for (size_t i = 0; i < rank_size * number_of_ranks; ++i) {
         input_data[i] = static_cast<int>(i);
     }
@@ -62,6 +65,8 @@ int main(int argc, char **argv)
     UNWRAP_VKRESULT(create_compute_buffer(
         &compute_device, sizeof(UniformBufferObject), &uniform_buffer_object,
         VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+
+    // fill uniform buffer
     UNWRAP_VKRESULT(write_to_compute_buffer(
         &compute_device, &uniform_buffer_object, 0, sizeof(UniformBufferObject),
         static_cast<const void *>(&ubo)));
@@ -84,12 +89,28 @@ int main(int argc, char **argv)
 
     // run compute
     uint32_t size = rank_size;
-    print_data_buffers(&compute_device, size, input_buffer.m_buffer_memory,
-                       output_buffer.m_buffer_memory);
-    run_compute_pipeline_sync(&compute_device, &compute_pipeline,
-                              &compute_descriptor_sets, size, 1, 1);
-    print_data_buffers(&compute_device, size, input_buffer.m_buffer_memory,
-                       output_buffer.m_buffer_memory);
+    UNWRAP_VKRESULT(
+        run_compute_pipeline_sync(&compute_device, &compute_pipeline,
+                                  &compute_descriptor_sets, size, 1, 1));
+
+    // verify output data
+    std::vector<int> output_data(rank_size);
+    UNWRAP_VKRESULT(read_from_compute_buffer(&compute_device, &output_buffer, 0,
+                                             output_buffer.m_size,
+                                             output_data.data()));
+    for (size_t i = 0; i < rank_size; ++i) {
+        // compute expected data
+        int expected_value = 0;
+        for (size_t rank = 0; rank < number_of_ranks; ++rank) {
+            expected_value += input_data[rank * rank_size + i];
+        }
+        if (output_data[i] != expected_value) {
+            printf("Unexpected value at i = %lu: output_data[i] = %d, "
+                   "expected_value = %d\n",
+                   i, output_data[i], expected_value);
+        }
+    }
+    printf("Success, all values expected!\n");
 
     // cleanup
     destroy_compute_buffer(&compute_device, &input_buffer);
