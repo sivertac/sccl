@@ -20,16 +20,35 @@ int main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
+    ComputeDevice compute_device = {};
+    UNWRAP_VKRESULT(create_compute_device(true, &compute_device));
+
+    // query device limits
+    VkPhysicalDeviceProperties physical_device_properties;
+    vkGetPhysicalDeviceProperties(compute_device.m_physical_device,
+                                  &physical_device_properties);
+    printf("physical_device_properties.limits.maxComputeWorkGroupSize[0] = "
+           "%" PRIu32 "\n",
+           physical_device_properties.limits.maxComputeWorkGroupSize[0]);
+    printf("physical_device_properties.limits.maxComputeWorkGroupSize[1] = "
+           "%" PRIu32 "\n",
+           physical_device_properties.limits.maxComputeWorkGroupSize[1]);
+    printf("physical_device_properties.limits.maxComputeWorkGroupSize[2] = "
+           "%" PRIu32 "\n",
+           physical_device_properties.limits.maxComputeWorkGroupSize[2]);
+
+    // set rank sizes
     unsigned int number_of_ranks = 4;
-    unsigned int rank_size = 10;
+    unsigned int rank_size =
+        physical_device_properties.limits.maxComputeWorkGroupCount[0];
     size_t rank_size_bytes = rank_size * sizeof(int);
+    printf("number_of_ranks = %d\n", number_of_ranks);
+    printf("rank_size = %d\n", rank_size);
+    printf("rank_size_bytes = %lu\n", rank_size_bytes);
 
     UniformBufferObject ubo = {};
     ubo.numberOfRanks = number_of_ranks;
     ubo.rankSize = rank_size;
-
-    ComputeDevice compute_device = {};
-    UNWRAP_VKRESULT(create_compute_device(true, &compute_device));
 
     // read shader
     auto shader_source = read_file(COMPUTE_SHADER_PATH);
@@ -75,7 +94,7 @@ int main(int argc, char **argv)
     ComputePipeline compute_pipeline;
     UNWRAP_VKRESULT(create_compute_pipeline(
         &compute_device, shader_source.value().data(),
-        shader_source.value().size(), 1, 1, 1, &compute_pipeline));
+        shader_source.value().size(), 1, 1, 1, NULL, &compute_pipeline));
 
     // create descriptor set
     ComputeDescriptorSets compute_descriptor_sets;

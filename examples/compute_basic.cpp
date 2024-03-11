@@ -32,11 +32,25 @@ int main(int argc, char **argv)
     UNWRAP_VKRESULT(create_compute_buffer(&compute_device, 1000, &output_buffer,
                                           VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
 
+    // set up SpecializationInfo, this is used to set constants in shader, for
+    // example work group size
+    int32_t constant_1 = 2;
+    VkSpecializationMapEntry specialization_map_entry = {};
+    specialization_map_entry.constantID = 0;
+    specialization_map_entry.offset = 0;
+    specialization_map_entry.size = sizeof(constant_1);
+    VkSpecializationInfo specialization_info = {};
+    specialization_info.mapEntryCount = 1;
+    specialization_info.pMapEntries = &specialization_map_entry;
+    specialization_info.dataSize = sizeof(constant_1);
+    specialization_info.pData = &constant_1;
+
     // create compute pipeline
     ComputePipeline compute_pipeline;
-    UNWRAP_VKRESULT(create_compute_pipeline(
-        &compute_device, shader_source.value().data(),
-        shader_source.value().size(), 1, 1, 0, &compute_pipeline));
+    UNWRAP_VKRESULT(
+        create_compute_pipeline(&compute_device, shader_source.value().data(),
+                                shader_source.value().size(), 1, 1, 0,
+                                &specialization_info, &compute_pipeline));
 
     // create descriptor sets
     ComputeDescriptorSets compute_descriptor_sets;

@@ -56,13 +56,12 @@ VkResult create_compute_device(bool enable_validation_layers,
 
 void destroy_compute_device(ComputeDevice *compute_device);
 
-VkResult create_compute_pipeline(const ComputeDevice *compute_device,
-                                 const char *shader_source,
-                                 const size_t shader_source_size,
-                                 const int num_input_buffers,
-                                 const int num_output_buffers,
-                                 const int num_uniform_buffers,
-                                 ComputePipeline *compute_pipeline);
+VkResult create_compute_pipeline(
+    const ComputeDevice *compute_device, const char *shader_source,
+    const size_t shader_source_size, const int num_input_buffers,
+    const int num_output_buffers, const int num_uniform_buffers,
+    const VkSpecializationInfo *specialization_info,
+    ComputePipeline *compute_pipeline);
 
 VkResult update_compute_descriptor_sets(
     const ComputeDevice *compute_device,

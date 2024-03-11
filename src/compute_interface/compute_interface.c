@@ -246,8 +246,9 @@ create_descriptor_pool(VkDevice device,
 }
 
 static VkResult create_compute_pipeline_impl(
-    VkDevice device, VkDescriptorSetLayout *descriptor_set_layouts,
+    VkDevice device, const VkDescriptorSetLayout *descriptor_set_layouts,
     uint32_t num_descriptor_set_layouts, VkShaderModule shader_module,
+    const VkSpecializationInfo *specialization_info,
     VkPipelineLayout *pipeline_layout, VkPipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
@@ -271,6 +272,7 @@ static VkResult create_compute_pipeline_impl(
     stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stageInfo.module = shader_module;
     stageInfo.pName = "main";
+    stageInfo.pSpecializationInfo = specialization_info;
 
     pipelineInfo.stage = stageInfo;
 
@@ -394,13 +396,12 @@ void destroy_compute_device(ComputeDevice *compute_device)
     vkDestroyInstance(compute_device->m_instance, NULL);
 }
 
-VkResult create_compute_pipeline(const ComputeDevice *compute_device,
-                                 const char *shader_source,
-                                 const size_t shader_source_size,
-                                 const int num_input_buffers,
-                                 const int num_output_buffers,
-                                 const int num_uniform_buffers,
-                                 ComputePipeline *compute_pipeline)
+VkResult create_compute_pipeline(
+    const ComputeDevice *compute_device, const char *shader_source,
+    const size_t shader_source_size, const int num_input_buffers,
+    const int num_output_buffers, const int num_uniform_buffers,
+    const VkSpecializationInfo *specialization_info,
+    ComputePipeline *compute_pipeline)
 {
     VkResult res = VK_SUCCESS;
 
@@ -478,7 +479,7 @@ VkResult create_compute_pipeline(const ComputeDevice *compute_device,
     res = create_compute_pipeline_impl(
         compute_device->m_device, descriptor_set_layouts,
         num_descriptor_set_layouts, compute_pipeline->m_shader_module,
-        &compute_pipeline->m_pipeline_layout,
+        specialization_info, &compute_pipeline->m_pipeline_layout,
         &compute_pipeline->m_compute_pipeline);
     if (res != VK_SUCCESS) {
         return res;

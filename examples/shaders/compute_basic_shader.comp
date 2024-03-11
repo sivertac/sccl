@@ -11,8 +11,13 @@ layout(set = 1, binding = 0) buffer OutputBuffer {
     int outputData[];
 };
 
+//layout(constant_id = 0) const int ASD = 0;
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
 void main() {
     uint idx = gl_GlobalInvocationID.x;
-    outputData[idx] = inputData[idx] / 2;
-    outputData[idx] = asd();
+    //outputData[idx] = inputData[idx] / 2;
+    //outputData[idx] = asd();
+    outputData[idx] = int(gl_LocalInvocationID.x);
 }
