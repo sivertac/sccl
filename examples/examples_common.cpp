@@ -41,7 +41,12 @@ std::optional<std::string> read_file(const char *filepath)
     size_t size = ftell(file);
     rewind(file);
     char *data = (char *)malloc(size);
-    fread(data, 1, size, file);
+    size_t read_size = fread(data, 1, size, file);
+    if (read_size < size) {
+        free(data);
+        fclose(file);
+        return std::nullopt;
+    }
     fclose(file);
 
     std::string ret(data, size);

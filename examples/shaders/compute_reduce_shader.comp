@@ -1,5 +1,9 @@
 #version 460
 #extension GL_GOOGLE_include_directive : require
+//#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+//#extension GL_EXT_buffer_reference : require
+//#extension GL_EXT_buffer_reference2 : require
+//#extension GL_ARB_gpu_shader_int64 : require
 
 layout(set = 0, binding = 0) buffer InputBuffer {
     int inputData[];
@@ -14,11 +18,15 @@ layout(set = 2, binding = 0) uniform UniformBufferObject {
     uint rankSize;
 } ubo;
 
+layout(local_size_x_id = 0, local_size_y_id = 1, local_size_z_id = 2) in;
+
 void main() {
-    uint idx = gl_GlobalInvocationID.x;
+    uint index = gl_GlobalInvocationID.x +
+                gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x +
+                gl_GlobalInvocationID.z * gl_NumWorkGroups.x * gl_WorkGroupSize.x * gl_NumWorkGroups.y * gl_WorkGroupSize.z;
     int sum = 0;
     for (int rank = 0; rank < ubo.numberOfRanks; ++rank) {
-        sum += inputData[idx + (ubo.rankSize * rank)];
-    }
-    outputData[idx] = sum;
+        sum += inputData[index + (rank * ubo.rankSize)];
+    }   
+    outputData[index] = sum;
 }

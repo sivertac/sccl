@@ -5,8 +5,8 @@
 
 #include "compute_interface.h"
 
-const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
-const size_t num_validation_layers = 1;
+static const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
+static const size_t num_validation_layers = 1;
 
 static VkResult create_debug_utils_messenger_ext(
     VkInstance instance, const VkDebugUtilsMessengerCreateInfoEXT *pCreateInfo,
@@ -112,7 +112,7 @@ static VkResult create_instance(bool enable_validation_layers,
 {
     *instance = VK_NULL_HANDLE;
 
-    VkApplicationInfo app_info = {};
+    VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     app_info.pApplicationName = "Compute Shader Meme";
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -120,7 +120,7 @@ static VkResult create_instance(bool enable_validation_layers,
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.apiVersion = VK_API_VERSION_1_3;
 
-    VkInstanceCreateInfo create_info = {};
+    VkInstanceCreateInfo create_info = {0};
     create_info.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
     create_info.pApplicationInfo = &app_info;
     if (enable_validation_layers) {
@@ -168,17 +168,21 @@ static VkResult create_logical_device(VkPhysicalDevice physical_device,
 {
     float queuePriority = 1.0f; // Priority of the compute queue (0.0 to 1.0)
 
-    VkDeviceQueueCreateInfo queueCreateInfo = {};
+    VkDeviceQueueCreateInfo queueCreateInfo = {0};
     queueCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queueCreateInfo.queueFamilyIndex =
         0; // Assuming compute queue is in the first family
     queueCreateInfo.queueCount = 1;
     queueCreateInfo.pQueuePriorities = &queuePriority;
 
-    VkDeviceCreateInfo deviceCreateInfo = {};
+    VkPhysicalDeviceFeatures physical_device_features = {0};
+    physical_device_features.shaderInt64 = true;
+
+    VkDeviceCreateInfo deviceCreateInfo = {0};
     deviceCreateInfo.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     deviceCreateInfo.queueCreateInfoCount = 1;
     deviceCreateInfo.pQueueCreateInfos = &queueCreateInfo;
+    deviceCreateInfo.pEnabledFeatures = &physical_device_features;
 
     return vkCreateDevice(physical_device, &deviceCreateInfo, NULL, device);
 }
@@ -188,7 +192,7 @@ static VkResult create_shader_module(VkDevice device, const char *shader_source,
                                      VkShaderModule *shader_module)
 {
     // Create shader module
-    VkShaderModuleCreateInfo createInfo = {};
+    VkShaderModuleCreateInfo createInfo = {0};
     createInfo.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO;
     createInfo.codeSize = shader_source_size;
     createInfo.pCode = (const uint32_t *)shader_source;
@@ -217,7 +221,7 @@ create_descriptor_set_layout(VkDevice device, uint32_t num_bindings,
         inputBinding->stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
     }
 
-    VkDescriptorSetLayoutCreateInfo layoutInfo = {};
+    VkDescriptorSetLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
     layoutInfo.bindingCount = num_bindings;
     layoutInfo.pBindings = bindings;
@@ -253,7 +257,7 @@ static VkResult create_compute_pipeline_impl(
 {
     VkResult res = VK_SUCCESS;
 
-    VkPipelineLayoutCreateInfo layoutInfo = {};
+    VkPipelineLayoutCreateInfo layoutInfo = {0};
     layoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     layoutInfo.setLayoutCount = num_descriptor_set_layouts;
     layoutInfo.pSetLayouts = descriptor_set_layouts;
@@ -263,11 +267,11 @@ static VkResult create_compute_pipeline_impl(
         return res;
     }
 
-    VkComputePipelineCreateInfo pipelineInfo = {};
+    VkComputePipelineCreateInfo pipelineInfo = {0};
     pipelineInfo.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     pipelineInfo.layout = *pipeline_layout;
 
-    VkPipelineShaderStageCreateInfo stageInfo = {};
+    VkPipelineShaderStageCreateInfo stageInfo = {0};
     stageInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO;
     stageInfo.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     stageInfo.module = shader_module;
@@ -291,7 +295,7 @@ static VkResult create_command_buffer(VkDevice device,
 {
     VkResult res = VK_SUCCESS;
 
-    VkCommandPoolCreateInfo poolInfo = {};
+    VkCommandPoolCreateInfo poolInfo = {0};
     poolInfo.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     poolInfo.queueFamilyIndex =
         0; // Replace with the appropriate queue family index
@@ -302,7 +306,7 @@ static VkResult create_command_buffer(VkDevice device,
         return res;
     }
 
-    VkCommandBufferAllocateInfo allocInfo = {};
+    VkCommandBufferAllocateInfo allocInfo = {0};
     allocInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
     allocInfo.commandPool = *command_pool;
     allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
@@ -515,27 +519,33 @@ static VkResult update_descriptor_set(VkDevice device,
     memset(descriptor_writes, 0,
            num_descriptor_writes * sizeof(VkWriteDescriptorSet));
 
-    for (uint32_t i = 0; i < num_bindings; ++i) {
-        size_t write_index = i;
+    VkDescriptorBufferInfo *descriptor_buffer_infos;
+    descriptor_buffer_infos = (VkDescriptorBufferInfo *)malloc(
+        num_descriptor_writes * sizeof(VkDescriptorBufferInfo));
+    if (descriptor_buffer_infos == NULL) {
+        return VK_ERROR_UNKNOWN;
+    }
+    memset(descriptor_buffer_infos, 0,
+           num_descriptor_writes * sizeof(VkDescriptorBufferInfo));
 
-        VkDescriptorBufferInfo buffer_info = {};
-        buffer_info.buffer = buffers[i];
-        buffer_info.offset = 0;
-        buffer_info.range = buffer_sizes[i];
+    for (uint32_t i = 0; i < num_descriptor_writes; ++i) {
+        descriptor_buffer_infos[i].buffer = buffers[i];
+        descriptor_buffer_infos[i].offset = 0;
+        descriptor_buffer_infos[i].range = buffer_sizes[i];
 
-        descriptor_writes[write_index].sType =
-            VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-        descriptor_writes[write_index].dstSet = descriptor_set;
-        descriptor_writes[write_index].dstBinding = write_index;
-        descriptor_writes[write_index].dstArrayElement = 0;
-        descriptor_writes[write_index].descriptorType = descriptor_type;
-        descriptor_writes[write_index].descriptorCount = 1;
-        descriptor_writes[write_index].pBufferInfo = &buffer_info;
+        descriptor_writes[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        descriptor_writes[i].dstSet = descriptor_set;
+        descriptor_writes[i].dstBinding = i;
+        descriptor_writes[i].dstArrayElement = 0;
+        descriptor_writes[i].descriptorType = descriptor_type;
+        descriptor_writes[i].descriptorCount = 1;
+        descriptor_writes[i].pBufferInfo = &descriptor_buffer_infos[i];
     }
 
     vkUpdateDescriptorSets(device, num_descriptor_writes, descriptor_writes, 0,
                            NULL);
 
+    free(descriptor_buffer_infos);
     free(descriptor_writes);
 
     return res;
@@ -627,7 +637,7 @@ run_compute_pipeline_sync(const ComputeDevice *compute_device,
 
     vkResetCommandBuffer(compute_pipeline->m_command_buffer, 0);
 
-    VkCommandBufferBeginInfo begin_info = {};
+    VkCommandBufferBeginInfo begin_info = {0};
     begin_info.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     begin_info.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
@@ -667,7 +677,7 @@ run_compute_pipeline_sync(const ComputeDevice *compute_device,
 
     vkEndCommandBuffer(compute_pipeline->m_command_buffer);
 
-    VkSubmitInfo submitInfo = {};
+    VkSubmitInfo submitInfo = {0};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
     submitInfo.pCommandBuffers = &compute_pipeline->m_command_buffer;
@@ -722,7 +732,7 @@ create_compute_descriptor_sets(const ComputeDevice *compute_device,
     // zero init
     memset(compute_descriptor_sets, 0, sizeof(ComputeDescriptorSets));
 
-    VkDescriptorSetAllocateInfo allocInfo = {};
+    VkDescriptorSetAllocateInfo allocInfo = {0};
 
     // Create input descriptor set
     memset(&allocInfo, 0, sizeof(VkDescriptorSetAllocateInfo));
