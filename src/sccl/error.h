@@ -3,6 +3,7 @@
 #define VULKAN_COMMON_HEADER
 
 #include "sccl.h"
+#include <assert.h>
 #include <vulkan/vulkan.h>
 
 #define UNWRAP_VKRESULT(result)                                                \

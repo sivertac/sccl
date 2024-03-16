@@ -7,9 +7,12 @@
 extern "C" {
 #endif
 
+#include <stdint.h>
+
 /**
- * Sivert Cubedo Compute Library (SCCL)
- * ~Sivert Cubedo General-Purpose Graphics Processing Unit Library (SCGPGPUL)~
+ * Sivert Collective Compute Library (SCCL)
+ * ~Sivert Collective General-Purpose Graphics Processing Unit Library
+ * (SCGPGPUL)~
  */
 
 /* Error type */
@@ -36,7 +39,13 @@ sccl_error_t sccl_create_instance(sccl_instance_t *instance);
 
 void sccl_destroy_instance(sccl_instance_t instance);
 
-sccl_error_t sccl_create_device();
+sccl_error_t sccl_get_device_count(const sccl_instance_t instance,
+                                   uint32_t *device_count);
+
+sccl_error_t sccl_create_device(const sccl_instance_t instance,
+                                sccl_device_t *device, uint32_t device_index);
+
+void sccl_destroy_device(sccl_device_t device);
 
 #ifdef __cplusplus
 }

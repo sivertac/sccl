@@ -9,9 +9,29 @@
 static const char *validation_layers[] = {"VK_LAYER_KHRONOS_validation"};
 static const size_t num_validation_layers = 1;
 
-sccl_error_t sccl_create_instance(sccl_instance_t *instance)
+static sccl_error_t update_physical_device_list(sccl_instance_t instance)
 {
 
+    if (instance->physical_devices != SCCL_NULL) {
+        sccl_free(instance->physical_devices);
+    }
+
+    CHECK_VKRESULT_RET(vkEnumeratePhysicalDevices(
+        instance->instance, &instance->physical_device_count, NULL));
+
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&instance->physical_devices,
+                                     instance->physical_device_count,
+                                     sizeof(VkPhysicalDevice)));
+
+    CHECK_VKRESULT_RET(vkEnumeratePhysicalDevices(
+        instance->instance, &instance->physical_device_count,
+        instance->physical_devices));
+
+    return sccl_success;
+}
+
+sccl_error_t sccl_create_instance(sccl_instance_t *instance)
+{
     struct sccl_instance *instance_internal;
     CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&instance_internal, 1,
                                      sizeof(struct sccl_instance)));
@@ -42,6 +62,9 @@ sccl_error_t sccl_create_instance(sccl_instance_t *instance)
     CHECK_VKRESULT_RET(
         vkCreateInstance(&create_info, NULL, &instance_internal->instance));
 
+    /* populate physical device list */
+    CHECK_SCCL_ERROR_RET(update_physical_device_list(instance_internal));
+
     /* set public handle */
     *instance = (sccl_instance_t)instance_internal;
 
@@ -50,8 +73,22 @@ sccl_error_t sccl_create_instance(sccl_instance_t *instance)
 
 void sccl_destroy_instance(sccl_instance_t instance)
 {
+    if (instance->physical_devices != SCCL_NULL) {
+        sccl_free(instance->physical_devices);
+    }
 
     vkDestroyInstance(instance->instance, NULL);
 
     sccl_free((void *)instance);
+}
+
+sccl_error_t sccl_get_device_count(const sccl_instance_t instance,
+                                   uint32_t *device_count)
+{
+
+    CHECK_SCCL_ERROR_RET(update_physical_device_list(instance));
+
+    *device_count = instance->physical_device_count;
+
+    return sccl_success;
 }

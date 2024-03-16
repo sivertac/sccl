@@ -4,7 +4,7 @@
 
 #include <gtest/gtest.h>
 
-TEST(nccl_instance, init)
+TEST(nccl_instance, create_instance)
 {
 
     sccl_instance_t instance;

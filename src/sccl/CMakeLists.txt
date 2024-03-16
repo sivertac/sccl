@@ -5,6 +5,7 @@ add_library(sccl
     ${CMAKE_CURRENT_SOURCE_DIR}/enviroment_variables.c
     ${CMAKE_CURRENT_SOURCE_DIR}/instance.c
     ${CMAKE_CURRENT_SOURCE_DIR}/alloc.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/device.c
 )
 target_compile_features(sccl PRIVATE c_std_17)
 target_compile_options(sccl PRIVATE -Wall -Wextra -Wswitch)
