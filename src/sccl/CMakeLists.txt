@@ -9,6 +9,7 @@ add_library(sccl
 target_compile_features(sccl PRIVATE c_std_17)
 target_compile_options(sccl PRIVATE -Wall -Wextra -Wswitch)
 target_include_directories(sccl PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(sccl PRIVATE Vulkan::Vulkan)
 
 set_target_properties(sccl PROPERTIES PUBLIC_HEADER
     "${CMAKE_CURRENT_SOURCE_DIR}/sccl.h"

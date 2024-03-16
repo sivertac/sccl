@@ -47,3 +47,11 @@ sccl_error_t sccl_create_instance(sccl_instance_t *instance)
 
     return sccl_success;
 }
+
+void sccl_destroy_instance(sccl_instance_t instance)
+{
+
+    vkDestroyInstance(instance->instance, NULL);
+
+    sccl_free((void *)instance);
+}

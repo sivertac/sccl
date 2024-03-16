@@ -34,6 +34,8 @@ typedef struct sccl_device *sccl_device_t;
 
 sccl_error_t sccl_create_instance(sccl_instance_t *instance);
 
+void sccl_destroy_instance(sccl_instance_t instance);
+
 sccl_error_t sccl_create_device();
 
 #ifdef __cplusplus

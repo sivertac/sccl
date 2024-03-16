@@ -19,3 +19,8 @@ add_compile_options(-Wuninitialized -Werror -Wall)
 
 add_subdirectory(src)
 add_subdirectory(examples)
+
+if (NOT NO_TESTS)
+    enable_testing()
+    add_subdirectory(test)
+endif()
