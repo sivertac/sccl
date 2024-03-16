@@ -27,13 +27,17 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device,
                                               &queue_family_count, NULL);
     if (queue_family_count == 0) {
-        return sccl_invalid_usage;
+        return sccl_unsupported_error;
     }
 
     VkQueueFamilyProperties2 *queue_family_properties;
     CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&queue_family_properties,
                                      queue_family_count,
                                      sizeof(VkQueueFamilyProperties2)));
+    for (size_t i = 0; i < queue_family_count; ++i) {
+        queue_family_properties[i].sType =
+            VK_STRUCTURE_TYPE_QUEUE_FAMILY_PROPERTIES_2;
+    }
 
     vkGetPhysicalDeviceQueueFamilyProperties2(
         physical_device, &queue_family_count, queue_family_properties);
@@ -52,7 +56,7 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
 
     if (!found) {
         sccl_free(queue_family_properties);
-        return sccl_invalid_usage;
+        return sccl_unsupported_error;
     }
 
     sccl_free(queue_family_properties);
@@ -77,7 +81,7 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
         find_queue_family_index(physical_device, &queue_family_index));
 
     /* create logical device
-        Priority of the compute queue (0.0 to 1.0)
+       priority of the compute queue (0.0 to 1.0)
     */
     float queue_priority = 1.0f;
 

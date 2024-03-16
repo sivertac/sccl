@@ -28,7 +28,6 @@ TEST_F(device_test, create_device)
     uint32_t device_count;
     EXPECT_EQ(sccl_get_device_count(instance, &device_count), sccl_success);
     EXPECT_GE(device_count, 1);
-
     sccl_device_t device;
     EXPECT_EQ(sccl_create_device(instance, &device, 0), sccl_success);
 

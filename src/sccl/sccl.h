@@ -22,7 +22,7 @@ typedef enum {
     sccl_system_error = 2,
     sccl_internal_error = 3,
     sccl_invalid_argument = 4,
-    sccl_invalid_usage = 5
+    sccl_unsupported_error = 5
 } sccl_error_t;
 
 /* Opaque handles */
