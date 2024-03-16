@@ -89,33 +89,23 @@ int main(int argc, char **argv)
     // distribute
     // physical_device_properties.properties.limits.maxStorageBufferRange
     // accross dimentions
-    unsigned int number_of_ranks = 10;
+    unsigned int number_of_ranks = 1000;
     size_t allocated_size =
         physical_device_properties.properties.limits.maxStorageBufferRange /
         sizeof(int) / number_of_ranks / shader_workgroup_size[0];
 
     uint32_t shader_workgroup_count[3];
-    shader_workgroup_count[0] =
-        (allocated_size > physical_device_properties.properties.limits
-                              .maxComputeWorkGroupCount[0])
-            ? physical_device_properties.properties.limits
-                  .maxComputeWorkGroupCount[0]
-            : allocated_size;
+    fill_until(allocated_size, shader_workgroup_count[0],
+               physical_device_properties.properties.limits
+                   .maxComputeWorkGroupCount[0]);
     allocated_size /= shader_workgroup_count[0];
-    shader_workgroup_count[1] =
-        (allocated_size > physical_device_properties.properties.limits
-                              .maxComputeWorkGroupCount[1])
-            ? physical_device_properties.properties.limits
-                  .maxComputeWorkGroupCount[1]
-            : allocated_size;
+    fill_until(allocated_size, shader_workgroup_count[1],
+               physical_device_properties.properties.limits
+                   .maxComputeWorkGroupCount[1]);
     allocated_size /= shader_workgroup_count[1];
-    shader_workgroup_count[2] =
-        (allocated_size > physical_device_properties.properties.limits
-                              .maxComputeWorkGroupCount[2])
-            ? physical_device_properties.properties.limits
-                  .maxComputeWorkGroupCount[2]
-            : allocated_size;
-    ;
+    fill_until(allocated_size, shader_workgroup_count[2],
+               physical_device_properties.properties.limits
+                   .maxComputeWorkGroupCount[2]);
 
     for (size_t i = 0; i < 3; ++i) {
         printf("shader_workgroup_count[%lu] = %" PRIu32 "\n", i,

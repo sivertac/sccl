@@ -24,6 +24,7 @@ void main() {
     uint index = gl_GlobalInvocationID.x +
                 gl_GlobalInvocationID.y * gl_NumWorkGroups.x * gl_WorkGroupSize.x +
                 gl_GlobalInvocationID.z * gl_NumWorkGroups.x * gl_WorkGroupSize.x * gl_NumWorkGroups.y * gl_WorkGroupSize.z;
+    
     int sum = 0;
     for (int rank = 0; rank < ubo.numberOfRanks; ++rank) {
         sum += inputData[index + (rank * ubo.rankSize)];
