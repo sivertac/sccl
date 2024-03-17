@@ -105,3 +105,21 @@ void sccl_destroy_buffer(sccl_buffer_t buffer)
     vkDestroyBuffer(buffer->device, buffer->buffer, NULL);
     sccl_free(buffer);
 }
+
+sccl_error_t sccl_host_map_buffer(const sccl_buffer_t buffer, void **data,
+                                  size_t offset, size_t size)
+{
+    if (buffer->type == sccl_buffer_type_device) {
+        return sccl_invalid_argument;
+    }
+
+    CHECK_VKRESULT_RET(vkMapMemory(buffer->device, buffer->device_memory,
+                                   offset, size, 0, data));
+
+    return sccl_success;
+}
+
+void sccl_host_unmap_buffer(const sccl_buffer_t buffer)
+{
+    vkUnmapMemory(buffer->device, buffer->device_memory);
+}

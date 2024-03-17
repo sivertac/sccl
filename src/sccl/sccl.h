@@ -59,11 +59,22 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
                                 sccl_buffer_t *buffer, sccl_buffer_type_t type,
                                 size_t size);
 
-sccl_error_t sccl_host_map_buffer();
-
-void sccl_host_unmap_buffer();
-
 void sccl_destroy_buffer(sccl_buffer_t buffer);
+
+/**
+ * Map buffer memory on host.
+ * It's only possible to have 1 map at any time per buffer.
+ * It's not possible to host map buffers of type `sccl_buffer_type_device`.
+ */
+sccl_error_t sccl_host_map_buffer(const sccl_buffer_t buffer, void **data,
+                                  size_t offset, size_t size);
+
+/**
+ * Unmap memory on host.
+ * Pointer `data` returned from `sccl_host_map_buffer` is invalid after this
+ * operation. It's possible to remap memory after unmapping.
+ */
+void sccl_host_unmap_buffer(const sccl_buffer_t buffer);
 
 #ifdef __cplusplus
 }
