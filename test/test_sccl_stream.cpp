@@ -32,3 +32,19 @@ TEST_F(stream_test, create_stream)
     EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
     sccl_destroy_stream(stream);
 }
+
+TEST_F(stream_test, dispatch_and_join)
+{
+    sccl_stream_t stream;
+    EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
+
+    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+
+    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+
+    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+
+    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+
+    sccl_destroy_stream(stream);
+}

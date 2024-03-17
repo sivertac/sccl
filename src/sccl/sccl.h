@@ -23,7 +23,8 @@ typedef enum {
     sccl_system_error = 2,
     sccl_internal_error = 3,
     sccl_invalid_argument = 4,
-    sccl_unsupported_error = 5
+    sccl_unsupported_error = 5,
+    sccl_out_of_resources_error = 6
 } sccl_error_t;
 
 /* Opaque handles */
@@ -81,6 +82,15 @@ sccl_error_t sccl_create_stream(const sccl_device_t device,
                                 sccl_stream_t *stream);
 
 void sccl_destroy_stream(sccl_stream_t stream);
+
+sccl_error_t sccl_dispatch_stream(const sccl_stream_t stream);
+
+sccl_error_t sccl_join_stream(const sccl_stream_t stream);
+
+sccl_error_t sccl_copy_buffer(const sccl_stream_t stream,
+                              const sccl_buffer_t src, size_t src_offset,
+                              const sccl_buffer_t dst, size_t dst_offset,
+                              size_t size);
 
 #ifdef __cplusplus
 }

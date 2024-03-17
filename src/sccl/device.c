@@ -80,24 +80,27 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
         get_physical_device_at_index(instance, &physical_device, device_index));
     device_internal->physical_device = physical_device;
 
-    uint32_t queue_count;
     CHECK_SCCL_ERROR_RET(find_queue_family_index(
-        physical_device, &device_internal->queue_family_index, &queue_count));
+        physical_device, &device_internal->queue_family_index,
+        &device_internal->queue_count));
 
-    /* create logical device
-       priority of the compute queue (0.0 to 1.0)
-    */
+    /* allocate space to store what queues are in use */
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&device_internal->queue_usage,
+                                     device_internal->queue_count,
+                                     sizeof(bool)));
+
     float *queue_priorities;
-    CHECK_SCCL_ERROR_RET(
-        sccl_calloc((void **)&queue_priorities, queue_count, sizeof(float)));
-    for (size_t i = 0; i < queue_count; ++i) {
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&queue_priorities,
+                                     device_internal->queue_count,
+                                     sizeof(float)));
+    for (size_t i = 0; i < device_internal->queue_count; ++i) {
         queue_priorities[i] = 1.0f;
     }
 
     VkDeviceQueueCreateInfo queue_create_info = {0};
     queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
     queue_create_info.queueFamilyIndex = device_internal->queue_family_index;
-    queue_create_info.queueCount = queue_count;
+    queue_create_info.queueCount = device_internal->queue_count;
     queue_create_info.pQueuePriorities = queue_priorities;
 
     VkPhysicalDeviceFeatures physical_device_features = {0};
@@ -124,5 +127,6 @@ void sccl_destroy_device(sccl_device_t device)
 {
     vkDestroyDevice(device->device, NULL);
 
+    sccl_free(device->queue_usage);
     sccl_free(device);
 }
