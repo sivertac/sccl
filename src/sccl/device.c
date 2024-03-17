@@ -21,7 +21,8 @@ get_physical_device_at_index(const sccl_instance_t instance,
 }
 
 static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
-                                            uint32_t *queue_family_index)
+                                            uint32_t *queue_family_index,
+                                            uint32_t *queue_count)
 {
     uint32_t queue_family_count;
     vkGetPhysicalDeviceQueueFamilyProperties2(physical_device,
@@ -50,6 +51,8 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
             (queue_flags & VK_QUEUE_TRANSFER_BIT)) {
             found = true;
             *queue_family_index = i;
+            *queue_count =
+                queue_family_properties[i].queueFamilyProperties.queueCount;
             break;
         }
     }
@@ -77,20 +80,25 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
         get_physical_device_at_index(instance, &physical_device, device_index));
     device_internal->physical_device = physical_device;
 
-    uint32_t queue_family_index;
-    CHECK_SCCL_ERROR_RET(
-        find_queue_family_index(physical_device, &queue_family_index));
+    uint32_t queue_count;
+    CHECK_SCCL_ERROR_RET(find_queue_family_index(
+        physical_device, &device_internal->queue_family_index, &queue_count));
 
     /* create logical device
        priority of the compute queue (0.0 to 1.0)
     */
-    float queue_priority = 1.0f;
+    float *queue_priorities;
+    CHECK_SCCL_ERROR_RET(
+        sccl_calloc((void **)&queue_priorities, queue_count, sizeof(float)));
+    for (size_t i = 0; i < queue_count; ++i) {
+        queue_priorities[i] = 1.0f;
+    }
 
     VkDeviceQueueCreateInfo queue_create_info = {0};
     queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_create_info.queueFamilyIndex = queue_family_index;
-    queue_create_info.queueCount = 1;
-    queue_create_info.pQueuePriorities = &queue_priority;
+    queue_create_info.queueFamilyIndex = device_internal->queue_family_index;
+    queue_create_info.queueCount = queue_count;
+    queue_create_info.pQueuePriorities = queue_priorities;
 
     VkPhysicalDeviceFeatures physical_device_features = {0};
     physical_device_features.shaderInt64 = true;
@@ -103,6 +111,8 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
 
     CHECK_VKRESULT_RET(vkCreateDevice(physical_device, &device_create_info,
                                       NULL, &device_internal->device));
+
+    sccl_free(queue_priorities);
 
     /* set public handle */
     *device = (sccl_device_t)device_internal;

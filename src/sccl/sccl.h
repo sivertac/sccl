@@ -30,6 +30,7 @@ typedef enum {
 typedef struct sccl_instance *sccl_instance_t;
 typedef struct sccl_device *sccl_device_t;
 typedef struct sccl_buffer *sccl_buffer_t;
+typedef struct sccl_stream *sccl_stream_t;
 #define SCCL_NULL NULL
 
 /**
@@ -75,6 +76,11 @@ sccl_error_t sccl_host_map_buffer(const sccl_buffer_t buffer, void **data,
  * operation. It's possible to remap memory after unmapping.
  */
 void sccl_host_unmap_buffer(const sccl_buffer_t buffer);
+
+sccl_error_t sccl_create_stream(const sccl_device_t device,
+                                sccl_stream_t *stream);
+
+void sccl_destroy_stream(sccl_stream_t stream);
 
 #ifdef __cplusplus
 }

@@ -2,6 +2,7 @@
 
 #include <sccl.h>
 
+#include "common.hpp"
 #include <gtest/gtest.h>
 
 class buffer_test : public testing::Test
@@ -10,7 +11,9 @@ protected:
     void SetUp() override
     {
         EXPECT_EQ(sccl_create_instance(&instance), sccl_success);
-        EXPECT_EQ(sccl_create_device(instance, &device, 0), sccl_success);
+        EXPECT_EQ(
+            sccl_create_device(instance, &device, get_environment_gpu_index()),
+            sccl_success);
     }
 
     void TearDown() override

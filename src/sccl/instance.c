@@ -1,7 +1,7 @@
 
 #include "instance.h"
 #include "alloc.h"
-#include "enviroment_variables.h"
+#include "environment_variables.h"
 #include "error.h"
 #include "sccl.h"
 #include <stdio.h>

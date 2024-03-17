@@ -1,3 +1,3 @@
 
 #include "sccl.h"
-#include "enviroment_variables.h"
+#include "environment_variables.h"

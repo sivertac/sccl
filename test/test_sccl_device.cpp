@@ -2,6 +2,7 @@
 
 #include <sccl.h>
 
+#include "common.hpp"
 #include <gtest/gtest.h>
 
 class device_test : public testing::Test
@@ -29,7 +30,9 @@ TEST_F(device_test, create_device)
     EXPECT_EQ(sccl_get_device_count(instance, &device_count), sccl_success);
     EXPECT_GE(device_count, 1);
     sccl_device_t device;
-    EXPECT_EQ(sccl_create_device(instance, &device, 0), sccl_success);
+    EXPECT_EQ(
+        sccl_create_device(instance, &device, get_environment_gpu_index()),
+        sccl_success);
 
     sccl_destroy_device(device);
 }
