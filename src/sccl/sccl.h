@@ -7,6 +7,7 @@
 extern "C" {
 #endif
 
+#include <stddef.h>
 #include <stdint.h>
 
 /**
@@ -28,6 +29,7 @@ typedef enum {
 /* Opaque handles */
 typedef struct sccl_instance *sccl_instance_t;
 typedef struct sccl_device *sccl_device_t;
+typedef struct sccl_buffer *sccl_buffer_t;
 #define SCCL_NULL NULL
 
 /**
@@ -46,6 +48,22 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
                                 sccl_device_t *device, uint32_t device_index);
 
 void sccl_destroy_device(sccl_device_t device);
+
+typedef enum {
+    sccl_buffer_type_host = 1,
+    sccl_buffer_type_device = 2,
+    sccl_buffer_type_shared = 3
+} sccl_buffer_type_t;
+
+sccl_error_t sccl_create_buffer(const sccl_device_t device,
+                                sccl_buffer_t *buffer, sccl_buffer_type_t type,
+                                size_t size);
+
+sccl_error_t sccl_host_map_buffer();
+
+void sccl_host_unmap_buffer();
+
+void sccl_destroy_buffer(sccl_buffer_t buffer);
 
 #ifdef __cplusplus
 }

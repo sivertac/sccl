@@ -25,3 +25,4 @@ endfunction()
 # add tests
 create_test(test_sccl_instance ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_instance.cpp)
 create_test(test_sccl_device ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_device.cpp)
+create_test(test_sccl_buffer ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_buffer.cpp)

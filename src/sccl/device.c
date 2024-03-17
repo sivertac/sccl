@@ -75,6 +75,7 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
     VkPhysicalDevice physical_device;
     CHECK_SCCL_ERROR_RET(
         get_physical_device_at_index(instance, &physical_device, device_index));
+    device_internal->physical_device = physical_device;
 
     uint32_t queue_family_index;
     CHECK_SCCL_ERROR_RET(
