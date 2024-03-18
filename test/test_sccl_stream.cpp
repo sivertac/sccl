@@ -36,6 +36,7 @@ TEST_F(stream_test, create_stream)
 TEST_F(stream_test, dispatch_and_join)
 {
     sccl_stream_t stream;
+
     EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
 
     EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
@@ -47,4 +48,28 @@ TEST_F(stream_test, dispatch_and_join)
     EXPECT_EQ(sccl_join_stream(stream), sccl_success);
 
     sccl_destroy_stream(stream);
+}
+
+TEST_F(stream_test, dispatch_and_join_multiple)
+{
+    /* arbitrary number of streams */
+    size_t stream_count = 10;
+    std::vector<sccl_stream_t> streams;
+
+    for (size_t i = 0; i < stream_count; ++i) {
+        streams.push_back({});
+        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+    }
+
+    for (sccl_stream_t stream : streams) {
+        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    }
+
+    for (sccl_stream_t stream : streams) {
+        EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    }
+
+    for (sccl_stream_t stream : streams) {
+        sccl_destroy_stream(stream);
+    }
 }

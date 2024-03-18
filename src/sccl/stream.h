@@ -8,8 +8,7 @@
 struct sccl_stream {
     VkCommandPool command_pool;
     VkCommandBuffer command_buffer;
-    uint32_t queue_index;
-    VkQueue queue;
+    VkFence fence;
     sccl_device_t device;
 };
 
