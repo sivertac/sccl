@@ -85,13 +85,10 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     CHECK_VKRESULT_RET(vkAllocateMemory(device->device, &alloc_info, NULL,
                                         &buffer_internal->device_memory));
 
-    /* bind if memory is on device */
-    if (buffer_internal->type == sccl_buffer_type_device ||
-        buffer_internal->type == sccl_buffer_type_shared) {
-        CHECK_VKRESULT_RET(
-            vkBindBufferMemory(buffer_internal->device, buffer_internal->buffer,
-                               buffer_internal->device_memory, 0));
-    }
+    /* bind */
+    CHECK_VKRESULT_RET(vkBindBufferMemory(buffer_internal->device,
+                                          buffer_internal->buffer,
+                                          buffer_internal->device_memory, 0));
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;

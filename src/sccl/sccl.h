@@ -36,8 +36,13 @@ typedef struct sccl_stream *sccl_stream_t;
 
 /**
  * To enable validation layers, set enviroment variable
- * `ENABLE_VALIDATION_LAYERS=1`
+ * `SCCL_ENABLE_VALIDATION_LAYERS=1`
+ *
+ * To make library assert when encountering a validation error, set enviroment
+ * variable `ASSERT_ON_VALIDATION_ERROR=1`
  */
+#define SCCL_ENABLE_VALIDATION_LAYERS "SCCL_ENABLE_VALIDATION_LAYERS"
+#define SCCL_ASSERT_ON_VALIDATION_ERROR "SCCL_ASSERT_ON_VALIDATION_ERROR"
 
 sccl_error_t sccl_create_instance(sccl_instance_t *instance);
 

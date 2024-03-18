@@ -1,6 +1,7 @@
 
 #include "stream.h"
 #include "alloc.h"
+#include "buffer.h"
 #include "device.h"
 #include "error.h"
 #include <stdbool.h>
@@ -118,7 +119,27 @@ sccl_error_t sccl_join_stream(const sccl_stream_t stream)
     return sccl_success;
 }
 
-// sccl_error_t sccl_copy_buffer(const sccl_stream_t stream, const sccl_buffer_t
-// src, size_t src_offset, const sccl_buffer_t dst, size_t dst_offset, size_t
-// size) {
-// }
+sccl_error_t sccl_copy_buffer(const sccl_stream_t stream,
+                              const sccl_buffer_t src, size_t src_offset,
+                              const sccl_buffer_t dst, size_t dst_offset,
+                              size_t size)
+{
+    VkBufferCopy buffer_copy = {0};
+    buffer_copy.srcOffset = src_offset;
+    buffer_copy.dstOffset = dst_offset;
+    buffer_copy.size = size;
+    vkCmdCopyBuffer(stream->command_buffer, src->buffer, dst->buffer, 1,
+                    &buffer_copy);
+
+    /* create barrier so next command will wait until this is finished */
+    VkMemoryBarrier memory_barrier = {};
+    memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    memory_barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    memory_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    vkCmdPipelineBarrier(stream->command_buffer,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
+                         &memory_barrier, 0, NULL, 0, NULL);
+
+    return sccl_success;
+}

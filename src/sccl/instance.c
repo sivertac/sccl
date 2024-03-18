@@ -48,6 +48,12 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL debug_callback(
     (void)pUserData;
     fprintf(stderr, "validation layer: %s\n", pCallbackData->pMessage);
 
+    if ((messageSeverity & VK_DEBUG_UTILS_MESSAGE_SEVERITY_ERROR_BIT_EXT) &&
+        (messageType & VK_DEBUG_UTILS_MESSAGE_TYPE_VALIDATION_BIT_EXT) &&
+        is_assert_on_validation_error_set()) {
+        assert(false);
+    }
+
     return VK_FALSE;
 }
 
