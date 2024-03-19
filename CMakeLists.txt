@@ -5,8 +5,6 @@ project(vulkan-compute-meme VERSION 0.0.1 LANGUAGES CXX C)
 find_package(Vulkan REQUIRED)
 find_package(Vulkan COMPONENTS glslc)
 find_program(glslc_executable NAMES glslc HINTS Vulkan::glslc)
-find_package(glm REQUIRED)
-find_package(glfw3 3.3.2 REQUIRED)
 
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 

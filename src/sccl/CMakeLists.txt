@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.25)
 
 add_library(sccl
-    ${CMAKE_CURRENT_SOURCE_DIR}/sccl.c
     ${CMAKE_CURRENT_SOURCE_DIR}/environment_variables.c
     ${CMAKE_CURRENT_SOURCE_DIR}/instance.c
     ${CMAKE_CURRENT_SOURCE_DIR}/alloc.c
