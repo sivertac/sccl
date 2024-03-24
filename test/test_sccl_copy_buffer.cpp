@@ -107,12 +107,17 @@ void copy_buffer_test::buffer_write_read_test(sccl_buffer_type_t source_type,
     sccl_destroy_buffer(host_buffer);
 }
 
-TEST_F(copy_buffer_test, copy_buffer_host_to_device)
+TEST_F(copy_buffer_test, all_valid_permutations)
 {
-    buffer_write_read_test(sccl_buffer_type_host, sccl_buffer_type_device);
-}
-
-TEST_F(copy_buffer_test, copy_buffer_host_to_host)
-{
-    buffer_write_read_test(sccl_buffer_type_host, sccl_buffer_type_host);
+    for (sccl_buffer_type_t src_type :
+         {sccl_buffer_type_host_storage, sccl_buffer_type_shared_storage,
+          sccl_buffer_type_host_uniform, sccl_buffer_type_shared_uniform}) {
+        for (sccl_buffer_type_t dst_type :
+             {sccl_buffer_type_host_storage, sccl_buffer_type_shared_storage,
+              sccl_buffer_type_host_uniform, sccl_buffer_type_shared_uniform,
+              sccl_buffer_type_device_storage,
+              sccl_buffer_type_device_uniform}) {
+            buffer_write_read_test(src_type, dst_type);
+        }
+    }
 }

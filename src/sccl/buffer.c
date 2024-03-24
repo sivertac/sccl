@@ -37,10 +37,24 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     buffer_internal->device = device->device;
 
     /* determine buffer usage flags */
-    VkBufferUsageFlags buffer_usage_flags;
-    buffer_usage_flags = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT |
-                         VK_BUFFER_USAGE_TRANSFER_SRC_BIT |
-                         VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+    VkBufferUsageFlags buffer_usage_flags = 0;
+    /* check if buffer is storage or uniform */
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_shared_storage:
+        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+        break;
+    case sccl_buffer_type_host_uniform:
+    case sccl_buffer_type_device_uniform:
+    case sccl_buffer_type_shared_uniform:
+        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+        break;
+    default:
+        return sccl_invalid_argument;
+    }
+    buffer_usage_flags |=
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
     /* create buffer */
     VkBufferCreateInfo buffer_info = {0};
@@ -58,16 +72,23 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
 
     /* determine memory property flags */
     VkMemoryPropertyFlags memory_property_flags;
-    if (type == sccl_buffer_type_host) {
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_host_uniform:
         memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-    } else if (type == sccl_buffer_type_device) {
+        break;
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_device_uniform:
         memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    } else if (type == sccl_buffer_type_shared) {
+        break;
+    case sccl_buffer_type_shared_storage:
+    case sccl_buffer_type_shared_uniform:
         memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
                                 VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
                                 VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-    } else {
+        break;
+    default:
         return sccl_invalid_argument;
     }
 
