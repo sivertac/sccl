@@ -7,6 +7,7 @@ add_library(sccl
     ${CMAKE_CURRENT_SOURCE_DIR}/device.c
     ${CMAKE_CURRENT_SOURCE_DIR}/buffer.c
     ${CMAKE_CURRENT_SOURCE_DIR}/stream.c
+    ${CMAKE_CURRENT_SOURCE_DIR}/shader.c
 )
 target_compile_features(sccl PRIVATE c_std_17)
 target_compile_options(sccl PRIVATE -Wall -Wextra -Wswitch)

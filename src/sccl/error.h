@@ -31,4 +31,12 @@
         }                                                                      \
     } while (0)
 
+/* Check if pointer is SCCL_NULL, return invalid argument if SCCL_NULL */
+#define CHECK_SCCL_NULL_RET(pointer)                                           \
+    do {                                                                       \
+        if (pointer == SCCL_NULL) {                                            \
+            return sccl_invalid_argument;                                      \
+        }                                                                      \
+    } while (0)
+
 #endif // VULKAN_COMMON_HEADER

@@ -81,13 +81,14 @@ typedef struct {
 } sccl_shader_buffer_binding_t;
 
 typedef struct {
-    char *shader_source_code;
-    size_t shader_source_code_length;
-    sccl_shader_specialization_constant_t *specialization_constants;
+    char *shader_source_code;         /* required */
+    size_t shader_source_code_length; /* must be larger than 0 */
+    sccl_shader_specialization_constant_t
+        *specialization_constants; /* optional */
     size_t specialization_constants_count;
-    sccl_shader_push_constant_layout_t *push_constant_layouts;
+    sccl_shader_push_constant_layout_t *push_constant_layouts; /* optional */
     size_t push_constant_layouts_count;
-    sccl_shader_buffer_layout_t *buffer_layouts;
+    sccl_shader_buffer_layout_t *buffer_layouts; /* optional */
     size_t buffer_layouts_count;
 } sccl_shader_config_t;
 
@@ -95,9 +96,11 @@ typedef struct {
     uint32_t group_count_x;
     uint32_t group_count_y;
     uint32_t group_count_z;
-    sccl_shader_buffer_binding_t *buffer_bindings;
+    sccl_shader_buffer_binding_t
+        *buffer_bindings; /* required if set in `sccl_shader_config_t` */
     size_t buffer_bindings_count;
-    sccl_shader_push_constant_binding *push_constant_bindings;
+    sccl_shader_push_constant_binding
+        *push_constant_bindings; /* required if set in `sccl_shader_config_t` */
     size_t push_constant_bindings_count;
 } sccl_shader_run_params_t;
 
@@ -161,6 +164,8 @@ sccl_error_t sccl_copy_buffer(const sccl_stream_t stream,
 sccl_error_t sccl_create_shader(const sccl_device_t device,
                                 sccl_shader_t *shader,
                                 const sccl_shader_config_t *config);
+
+void sccl_destroy_shader(sccl_shader_t shader);
 
 sccl_error_t sccl_run_shader(const sccl_shader_t shader,
                              const sccl_shader_run_params_t *params);

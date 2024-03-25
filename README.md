@@ -15,7 +15,7 @@ Sivert Collective Compute Library (SCCL) is a wrapper library for simplifying wr
 ### Run tests
 Run this is build directory:
 ```
-make -j $(nproc) && SCCL_ENABLE_VALIDATION_LAYERS=1 SCCL_ASSERT_ON_VALIDATION_ERROR=1 GPU_INDEX=0 make test_verbose && cat test/Testing/Temporary/LastTest.log 
+make -j $(nproc) && SCCL_ENABLE_VALIDATION_LAYERS=1 SCCL_ASSERT_ON_VALIDATION_ERROR=1 SCCL_TEST_GPU_INDEX=0 make test_verbose  && cat test/Testing/Temporary/LastTest.log 
 ```
 
 ## Pre-commit
