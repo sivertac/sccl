@@ -24,7 +24,7 @@ protected:
     sccl_device_t device;
 };
 
-TEST_F(shader_test, create_shader)
+TEST_F(shader_test, create_shader_noop)
 {
     std::string shader_source = read_test_shader("noop_shader.spv").value();
 

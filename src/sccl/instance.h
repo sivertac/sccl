@@ -6,9 +6,9 @@
 
 struct sccl_instance {
     VkInstance instance;
+    VkPhysicalDevice *physical_devices;
     VkDebugUtilsMessengerEXT debug_messenger;
     uint32_t physical_device_count;
-    VkPhysicalDevice *physical_devices;
 };
 
 #endif // INSTANCE_HEADER

@@ -6,10 +6,10 @@
 #include <vulkan/vulkan.h>
 
 struct sccl_stream {
+    sccl_device_t device;
     VkCommandPool command_pool;
     VkCommandBuffer command_buffer;
     VkFence fence;
-    sccl_device_t device;
 };
 
 #endif // STREAM_HEADER

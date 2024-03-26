@@ -11,4 +11,4 @@ struct sccl_shader {
     VkPipeline compute_pipeline;
 };
 
-#endif
+#endif // SHADER_HEADER

@@ -6,10 +6,10 @@
 #include <vulkan/vulkan.h>
 
 struct sccl_buffer {
+    VkDevice device;
     sccl_buffer_type_t type;
     VkBuffer buffer;
     VkDeviceMemory device_memory;
-    VkDevice device;
 };
 
 #endif // BUFFER_HEADER

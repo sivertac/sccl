@@ -8,8 +8,8 @@
 #define SCCL_QUEUE_INDEX 0
 
 struct sccl_device {
-    VkDevice device;
     VkPhysicalDevice physical_device;
+    VkDevice device;
     uint32_t queue_family_index;
 };
 

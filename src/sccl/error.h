@@ -1,6 +1,6 @@
 #pragma once
-#ifndef VULKAN_COMMON_HEADER
-#define VULKAN_COMMON_HEADER
+#ifndef SCCL_ERROR_HEADER
+#define SCCL_ERROR_HEADER
 
 #include "sccl.h"
 #include <assert.h>
@@ -39,4 +39,4 @@
         }                                                                      \
     } while (0)
 
-#endif // VULKAN_COMMON_HEADER
+#endif // SCCL_ERROR_HEADER
