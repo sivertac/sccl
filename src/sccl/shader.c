@@ -237,16 +237,6 @@ static sccl_error_t create_descriptor_set_layouts(
         sccl_free(descriptor_set_bindings);
     }
 
-    printf("vector_get_size(&descriptor_sets_to_allocate) = %lu\n",
-           vector_get_size(&descriptor_sets_to_allocate));
-    for (size_t i = 0; i < vector_get_size(&descriptor_sets_to_allocate); ++i) {
-        descriptor_set_entry_t *e =
-            vector_get_element(&descriptor_sets_to_allocate, i);
-        printf("descriptor_sets_to_allocate[%lu]: set = %" PRIu32
-               ", size = %lu\n",
-               i, e->set, vector_get_size(&e->buffer_layouts));
-    }
-
     /* destroy descriptor_sets_to_allocate */
     for (size_t i = 0; i < vector_get_size(&descriptor_sets_to_allocate); ++i) {
         descriptor_set_entry_destroy(
@@ -293,6 +283,25 @@ static sccl_error_t create_descriptor_pool(VkDevice device,
     CHECK_VKRESULT_RET(vkCreateDescriptorPool(
         device, &descriptor_pool_create_info, NULL, descriptor_pool));
     return sccl_success;
+}
+
+/**
+ * Check for duplicate constant ids.
+ */
+static bool verify_specialization_constants(
+    const sccl_shader_specialization_constant_t *specialization_constants,
+    size_t specialization_constants_count)
+{
+    for (size_t i = 0; i < specialization_constants_count; ++i) {
+        for (size_t j = 0; j < specialization_constants_count; ++j) {
+            if (specialization_constants[j].constant_id ==
+                    specialization_constants[i].constant_id &&
+                j != i) {
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 sccl_error_t sccl_create_shader(const sccl_device_t device,
@@ -345,6 +354,46 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
             &shader_internal->descriptor_pool));
     }
 
+    /* prepare specialization info */
+    /* verify */
+    if (!verify_specialization_constants(
+            config->specialization_constants,
+            config->specialization_constants_count)) {
+        return sccl_invalid_argument;
+    }
+    /* count total data size (in bytes) */
+    size_t total_specialization_constant_size = 0;
+    for (size_t i = 0; i < config->specialization_constants_count; ++i) {
+        total_specialization_constant_size +=
+            config->specialization_constants[i].size;
+    }
+    /* allocate specialization data memory and entries */
+    void *specialization_data;
+    CHECK_SCCL_ERROR_RET(sccl_calloc(&specialization_data,
+                                     total_specialization_constant_size,
+                                     sizeof(uint8_t)));
+    VkSpecializationMapEntry *specialization_map_entries;
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&specialization_map_entries,
+                                     config->specialization_constants_count,
+                                     sizeof(VkSpecializationMapEntry)));
+    /* init entries and copy data */
+    size_t offset = 0;
+    for (size_t i = 0; i < config->specialization_constants_count; ++i) {
+        sccl_shader_specialization_constant_t *constant =
+            &config->specialization_constants[i];
+        memcpy((uint8_t *)specialization_data + offset, constant->data,
+               constant->size);
+        specialization_map_entries[i].constantID = constant->constant_id;
+        specialization_map_entries[i].offset = offset;
+        specialization_map_entries[i].size = constant->size;
+        offset += constant->size;
+    }
+    VkSpecializationInfo specialization_info = {};
+    specialization_info.mapEntryCount = config->specialization_constants_count;
+    specialization_info.pMapEntries = specialization_map_entries;
+    specialization_info.dataSize = total_specialization_constant_size;
+    specialization_info.pData = specialization_data;
+
     /* create compute pipeline */
     VkPipelineLayoutCreateInfo pipeline_layout_create_info = {0};
     pipeline_layout_create_info.sType =
@@ -363,7 +412,8 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     pipeline_shader_stage_create_info.stage = VK_SHADER_STAGE_COMPUTE_BIT;
     pipeline_shader_stage_create_info.module = shader_internal->shader_module;
     pipeline_shader_stage_create_info.pName = "main";
-    pipeline_shader_stage_create_info.pSpecializationInfo = NULL;
+    pipeline_shader_stage_create_info.pSpecializationInfo =
+        &specialization_info;
 
     VkComputePipelineCreateInfo compute_pipeline_create_info = {0};
     compute_pipeline_create_info.sType =
@@ -376,6 +426,10 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
 
     /* set public handle */
     *shader = (sccl_shader_t)shader_internal;
+
+    /* cleanup */
+    sccl_free(specialization_map_entries);
+    sccl_free(specialization_data);
 
     return sccl_success;
 }

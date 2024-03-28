@@ -42,5 +42,5 @@ create_test(test_sccl_device SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_devic
 create_test(test_sccl_buffer SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_buffer.cpp)
 create_test(test_sccl_stream SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_stream.cpp)
 create_test(test_sccl_copy_buffer SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_copy_buffer.cpp)
-create_test(test_sccl_shader SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_shader.cpp DEPENDS noop_shader)
+create_test(test_sccl_shader SOURCES ${CMAKE_CURRENT_SOURCE_DIR}/test_sccl_shader.cpp DEPENDS noop_shader specialization_constants_shader)
 

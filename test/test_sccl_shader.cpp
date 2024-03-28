@@ -69,3 +69,40 @@ TEST_F(shader_test, create_shader_buffer_layout_valid)
 
     sccl_destroy_shader(shader);
 }
+
+TEST_F(shader_test, create_shader_specialization_constants)
+{
+    std::string shader_source =
+        read_test_shader("specialization_constants_shader.spv").value();
+
+    uint32_t c_0 = 0;
+    uint32_t c_1 = 1;
+    uint32_t c_2 = 2;
+    uint32_t c_3 = 3;
+
+    sccl_shader_specialization_constant_t specialization_constants[4];
+    specialization_constants[0].constant_id = 0;
+    specialization_constants[0].size = sizeof(uint32_t);
+    specialization_constants[0].data = &c_0;
+    specialization_constants[1].constant_id = 1;
+    specialization_constants[1].size = sizeof(uint32_t);
+    specialization_constants[1].data = &c_1;
+    specialization_constants[2].constant_id = 2;
+    specialization_constants[2].size = sizeof(uint32_t);
+    specialization_constants[2].data = &c_2;
+    specialization_constants[3].constant_id = 3;
+    specialization_constants[3].size = sizeof(uint32_t);
+    specialization_constants[3].data = &c_3;
+
+    sccl_shader_config_t shader_config = {};
+    shader_config.shader_source_code = shader_source.data();
+    shader_config.shader_source_code_length = shader_source.size();
+    shader_config.specialization_constants = specialization_constants;
+    shader_config.specialization_constants_count = 4;
+
+    sccl_shader_t shader;
+    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
+              sccl_success);
+
+    sccl_destroy_shader(shader);
+}

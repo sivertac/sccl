@@ -1,0 +1,11 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+layout (constant_id = 0) const uint c_0 = 0;
+layout (constant_id = 1) const uint c_1 = 0;
+layout (constant_id = 2) const uint c_2 = 0;
+layout (constant_id = 3) const uint c_3 = 0;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+}
