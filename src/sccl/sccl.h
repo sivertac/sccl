@@ -63,7 +63,7 @@ typedef struct {
     size_t index;
     /* size of data is set in `sccl_shader_push_constant_layout_t`*/
     void *data;
-} sccl_shader_push_constant_binding;
+} sccl_shader_push_constant_binding_t;
 
 typedef struct {
     uint32_t set;
@@ -99,7 +99,7 @@ typedef struct {
     sccl_shader_buffer_binding_t
         *buffer_bindings; /* required if set in `sccl_shader_config_t` */
     size_t buffer_bindings_count;
-    sccl_shader_push_constant_binding
+    sccl_shader_push_constant_binding_t
         *push_constant_bindings; /* required if set in `sccl_shader_config_t` */
     size_t push_constant_bindings_count;
 } sccl_shader_run_params_t;

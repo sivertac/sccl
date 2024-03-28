@@ -394,6 +394,18 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     specialization_info.dataSize = total_specialization_constant_size;
     specialization_info.pData = specialization_data;
 
+    /* prepare push constants */
+    /* create push constant range for each entry */
+    VkPushConstantRange *push_constant_ranges;
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&push_constant_ranges,
+                                     config->push_constant_layouts_count,
+                                     sizeof(VkPushConstantRange)));
+    for (size_t i = 0; i < config->push_constant_layouts_count; ++i) {
+        push_constant_ranges[i].offset = 0;
+        push_constant_ranges[i].size = config->push_constant_layouts[i].size;
+        push_constant_ranges[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    }
+
     /* create compute pipeline */
     VkPipelineLayoutCreateInfo pipeline_layout_create_info = {0};
     pipeline_layout_create_info.sType =
@@ -402,6 +414,9 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
         shader_internal->descriptor_set_layouts;
     pipeline_layout_create_info.setLayoutCount =
         shader_internal->descriptor_set_layouts_count;
+    pipeline_layout_create_info.pPushConstantRanges = push_constant_ranges;
+    pipeline_layout_create_info.pushConstantRangeCount =
+        config->push_constant_layouts_count;
     CHECK_VKRESULT_RET(
         vkCreatePipelineLayout(device->device, &pipeline_layout_create_info,
                                NULL, &shader_internal->pipeline_layout));
@@ -428,6 +443,7 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     *shader = (sccl_shader_t)shader_internal;
 
     /* cleanup */
+    sccl_free(push_constant_ranges);
     sccl_free(specialization_map_entries);
     sccl_free(specialization_data);
 

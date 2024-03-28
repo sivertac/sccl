@@ -11,3 +11,9 @@ compile_shader(
     ${CMAKE_CURRENT_SOURCE_DIR}/specialization_constants_shader.comp
     ${CMAKE_CURRENT_BINARY_DIR}/specialization_constants_shader.spv
 )
+
+compile_shader(
+    push_constants_shader
+    ${CMAKE_CURRENT_SOURCE_DIR}/push_constants_shader.comp
+    ${CMAKE_CURRENT_BINARY_DIR}/push_constants_shader.spv
+)

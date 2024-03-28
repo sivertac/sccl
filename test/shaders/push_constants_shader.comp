@@ -1,0 +1,13 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+layout (push_constant) uniform PushConstant {
+    uint c_0;
+    uint c_1;
+    uint c_2;
+    uint c_3;
+} push_constant;
+
+void main() {
+    uint idx = gl_GlobalInvocationID.x;
+}

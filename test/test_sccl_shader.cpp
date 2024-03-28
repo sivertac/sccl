@@ -106,3 +106,31 @@ TEST_F(shader_test, create_shader_specialization_constants)
 
     sccl_destroy_shader(shader);
 }
+
+TEST_F(shader_test, create_shader_push_constants)
+{
+    std::string shader_source =
+        read_test_shader("push_constants_shader.spv").value();
+
+    struct PushConstant {
+        uint32_t c_0;
+        uint32_t c_1;
+        uint32_t c_2;
+        uint32_t c_3;
+    } push_constant;
+
+    sccl_shader_push_constant_layout_t push_constants[1];
+    push_constants[0].size = sizeof(push_constant);
+
+    sccl_shader_config_t shader_config = {};
+    shader_config.shader_source_code = shader_source.data();
+    shader_config.shader_source_code_length = shader_source.size();
+    shader_config.push_constant_layouts = push_constants;
+    shader_config.push_constant_layouts_count = 1;
+
+    sccl_shader_t shader;
+    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
+              sccl_success);
+
+    sccl_destroy_shader(shader);
+}
