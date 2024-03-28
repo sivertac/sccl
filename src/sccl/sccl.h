@@ -16,7 +16,7 @@ extern "C" {
  * (SCGPGPUL)~
  */
 
-/* Error type */
+/* Error type enum */
 typedef enum {
     sccl_success = 0,
     sccl_unhandled_vulkan_error = 1,
@@ -27,6 +27,7 @@ typedef enum {
     sccl_out_of_resources_error = 6
 } sccl_error_t;
 
+/* Buffer type enum */
 typedef enum {
     sccl_buffer_type_host_storage = 1,
     sccl_buffer_type_host = 1,
@@ -39,12 +40,11 @@ typedef enum {
     sccl_buffer_type_shared_uniform = 6
 } sccl_buffer_type_t;
 
-/* Opaque handles */
-typedef struct sccl_instance *sccl_instance_t;
-typedef struct sccl_device *sccl_device_t;
-typedef struct sccl_buffer *sccl_buffer_t;
-typedef struct sccl_stream *sccl_stream_t;
-typedef struct sccl_shader *sccl_shader_t;
+typedef struct sccl_instance *sccl_instance_t; /* Opaque handle */
+typedef struct sccl_device *sccl_device_t;     /* Opaque handle */
+typedef struct sccl_buffer *sccl_buffer_t;     /* Opaque handle */
+typedef struct sccl_stream *sccl_stream_t;     /* Opaque handle */
+typedef struct sccl_shader *sccl_shader_t;     /* Opaque handle */
 #define SCCL_NULL NULL
 
 typedef struct {
