@@ -400,14 +400,29 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
 
     /* prepare push constants */
     /* create push constant range for each entry */
-    VkPushConstantRange *push_constant_ranges;
-    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&push_constant_ranges,
-                                     config->push_constant_layouts_count,
-                                     sizeof(VkPushConstantRange)));
-    for (size_t i = 0; i < config->push_constant_layouts_count; ++i) {
-        push_constant_ranges[i].offset = 0;
-        push_constant_ranges[i].size = config->push_constant_layouts[i].size;
-        push_constant_ranges[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+    VkPushConstantRange *push_constant_ranges = NULL;
+    if (config->push_constant_layouts_count > 0) {
+        CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&push_constant_ranges,
+                                         config->push_constant_layouts_count,
+                                         sizeof(VkPushConstantRange)));
+        for (size_t i = 0; i < config->push_constant_layouts_count; ++i) {
+            push_constant_ranges[i].offset = 0;
+            push_constant_ranges[i].size =
+                config->push_constant_layouts[i].size;
+            push_constant_ranges[i].stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+        }
+        /* store push constant sizes so we can know offsets when creating
+         * command buffer */
+        shader_internal->push_constant_layouts_count =
+            config->push_constant_layouts_count;
+        CHECK_SCCL_ERROR_RET(
+            sccl_calloc((void **)&shader_internal->push_constant_layouts,
+                        shader_internal->push_constant_layouts_count,
+                        sizeof(sccl_shader_push_constant_layout_t)));
+        memcpy(shader_internal->push_constant_layouts,
+               config->push_constant_layouts,
+               shader_internal->push_constant_layouts_count *
+                   sizeof(sccl_shader_push_constant_layout_t));
     }
 
     /* create compute pipeline */
@@ -458,6 +473,11 @@ void sccl_destroy_shader(sccl_shader_t shader)
 {
     vkDestroyPipeline(shader->device, shader->compute_pipeline, NULL);
     vkDestroyPipelineLayout(shader->device, shader->pipeline_layout, NULL);
+
+    if (shader->push_constant_layouts != NULL) {
+        sccl_free(shader->push_constant_layouts);
+    }
+
     if (shader->descriptor_pool != NULL) {
         vkDestroyDescriptorPool(shader->device, shader->descriptor_pool, NULL);
     }
@@ -477,9 +497,16 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                              const sccl_shader_run_params_t *params)
 {
 
+    /* validate */
+    /* check if push constants are in range */
+    if (params->push_constant_bindings_count >
+        shader->push_constant_layouts_count) {
+        return sccl_invalid_argument;
+    }
+
     /* allocate descriptor set, store in stream, will be freed when stream is
      * complete */
-    VkDescriptorSet *descriptor_sets;
+    VkDescriptorSet *descriptor_sets = NULL;
     CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&descriptor_sets,
                                      shader->descriptor_set_layouts_count,
                                      sizeof(VkDescriptorSet)));
@@ -527,8 +554,6 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
     vkUpdateDescriptorSets(stream->device->device,
                            params->buffer_bindings_count, write_descriptor_sets,
                            0, NULL);
-    sccl_free(descriptor_buffer_infos);
-    sccl_free(write_descriptor_sets);
 
     /* bind the compute pipeline */
     vkCmdBindPipeline(stream->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
@@ -540,6 +565,18 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
             stream->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
             shader->pipeline_layout, 0, shader->descriptor_set_layouts_count,
             descriptor_sets, 0, NULL);
+    }
+
+    /* push constants */
+    if (params->push_constant_bindings_count > 0) {
+        size_t offset = 0;
+        for (size_t i = 0; i < params->push_constant_bindings_count; ++i) {
+            vkCmdPushConstants(stream->command_buffer, shader->pipeline_layout,
+                               VK_SHADER_STAGE_COMPUTE_BIT, offset,
+                               shader->push_constant_layouts[i].size,
+                               params->push_constant_bindings[i].data);
+            offset += shader->push_constant_layouts[i].size;
+        }
     }
 
     /* dispatch the compute shader */
@@ -557,6 +594,8 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                          &memory_barrier, 0, NULL, 0, NULL);
 
     /* cleanup */
+    sccl_free(descriptor_buffer_infos);
+    sccl_free(write_descriptor_sets);
     sccl_free(descriptor_sets); /* vulkan handles will be destroyed when stream
                                    is done executing */
 

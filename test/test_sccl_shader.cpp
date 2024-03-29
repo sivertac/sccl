@@ -27,6 +27,30 @@ protected:
     sccl_stream_t stream;
 };
 
+static void
+init_output_buffer(const sccl_device_t device, size_t size,
+                   sccl_buffer_t *output_buffer,
+                   sccl_shader_buffer_layout_t *output_buffer_layout,
+                   sccl_shader_buffer_binding_t *output_buffer_binding)
+{
+    void *data;
+    EXPECT_EQ(sccl_create_buffer(device, output_buffer, sccl_buffer_type_shared,
+                                 size),
+              sccl_success);
+    /* init buffer to 0 */
+    EXPECT_EQ(sccl_host_map_buffer(*output_buffer, (void **)&data, 0, size),
+              sccl_success);
+    memset((void *)data, 0, size);
+    sccl_host_unmap_buffer(*output_buffer);
+    sccl_shader_buffer_position_t output_buffer_position = {};
+    output_buffer_position.set = 0;
+    output_buffer_position.binding = 0;
+    output_buffer_layout->position = output_buffer_position;
+    output_buffer_layout->type = sccl_buffer_type_shared;
+    output_buffer_binding->position = output_buffer_position;
+    output_buffer_binding->buffer = *output_buffer;
+}
+
 TEST_F(shader_test, shader_noop)
 {
     std::string shader_source = read_test_shader("noop_shader.spv").value();
@@ -97,6 +121,8 @@ TEST_F(shader_test, shader_buffer_layout)
     /* run */
     sccl_shader_run_params_t params = {};
     params.group_count_x = 1;
+    params.group_count_y = 1;
+    params.group_count_z = 1;
     params.buffer_bindings = bindings;
     params.buffer_bindings_count = binding_count;
 
@@ -116,15 +142,28 @@ TEST_F(shader_test, shader_buffer_layout)
 
 TEST_F(shader_test, shader_specialization_constants)
 {
+    const size_t specialization_constant_count = 4;
     std::string shader_source =
         read_test_shader("specialization_constants_shader.spv").value();
 
+    /* setup output buffer to verify results */
+    sccl_buffer_t output_buffer;
+    uint32_t *output_data;
+    const size_t output_buffer_size =
+        sizeof(uint32_t) * specialization_constant_count; // in bytes
+    sccl_shader_buffer_layout_t output_buffer_layout = {};
+    sccl_shader_buffer_binding_t output_buffer_binding = {};
+    init_output_buffer(device, output_buffer_size, &output_buffer,
+                       &output_buffer_layout, &output_buffer_binding);
+
+    /* setup specialization constants */
     uint32_t c_0 = 0;
     uint32_t c_1 = 1;
     uint32_t c_2 = 2;
     uint32_t c_3 = 3;
 
-    sccl_shader_specialization_constant_t specialization_constants[4];
+    sccl_shader_specialization_constant_t
+        specialization_constants[specialization_constant_count];
     specialization_constants[0].constant_id = 0;
     specialization_constants[0].size = sizeof(uint32_t);
     specialization_constants[0].data = &c_0;
@@ -142,17 +181,47 @@ TEST_F(shader_test, shader_specialization_constants)
     shader_config.shader_source_code = shader_source.data();
     shader_config.shader_source_code_length = shader_source.size();
     shader_config.specialization_constants = specialization_constants;
-    shader_config.specialization_constants_count = 4;
+    shader_config.specialization_constants_count =
+        specialization_constant_count;
+    shader_config.buffer_layouts = &output_buffer_layout;
+    shader_config.buffer_layouts_count = 1;
 
     sccl_shader_t shader;
     EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
               sccl_success);
 
+    /* run */
+    sccl_shader_run_params_t params = {};
+    params.group_count_x = 1;
+    params.group_count_y = 1;
+    params.group_count_z = 1;
+    params.buffer_bindings = &output_buffer_binding;
+    params.buffer_bindings_count = 1;
+
+    EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+
+    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+
+    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+
+    /* verify output data */
+    EXPECT_EQ(sccl_host_map_buffer(output_buffer, (void **)&output_data, 0,
+                                   output_buffer_size),
+              sccl_success);
+    ASSERT_EQ(*(output_data + 0), c_0);
+    ASSERT_EQ(*(output_data + 1), c_1);
+    ASSERT_EQ(*(output_data + 2), c_2);
+    ASSERT_EQ(*(output_data + 3), c_3);
+    sccl_host_unmap_buffer(output_buffer);
+
+    /* cleanup */
     sccl_destroy_shader(shader);
+    sccl_destroy_buffer(output_buffer);
 }
 
 TEST_F(shader_test, shader_push_constants)
 {
+    const size_t push_constant_count = 1;
     std::string shader_source =
         read_test_shader("push_constants_shader.spv").value();
 
@@ -161,20 +230,66 @@ TEST_F(shader_test, shader_push_constants)
         uint32_t c_1;
         uint32_t c_2;
         uint32_t c_3;
-    } push_constant;
+    };
 
-    sccl_shader_push_constant_layout_t push_constants[1];
-    push_constants[0].size = sizeof(push_constant);
+    /* setup output buffer to verify results */
+    sccl_buffer_t output_buffer;
+    uint32_t *output_data;
+    const size_t output_buffer_size = sizeof(PushConstant); // in bytes
+    sccl_shader_buffer_layout_t output_buffer_layout = {};
+    sccl_shader_buffer_binding_t output_buffer_binding = {};
+    init_output_buffer(device, output_buffer_size, &output_buffer,
+                       &output_buffer_layout, &output_buffer_binding);
+
+    sccl_shader_push_constant_layout_t
+        push_constant_layouts[push_constant_count];
+    push_constant_layouts[0].size = sizeof(PushConstant);
 
     sccl_shader_config_t shader_config = {};
     shader_config.shader_source_code = shader_source.data();
     shader_config.shader_source_code_length = shader_source.size();
-    shader_config.push_constant_layouts = push_constants;
-    shader_config.push_constant_layouts_count = 1;
+    shader_config.push_constant_layouts = push_constant_layouts;
+    shader_config.push_constant_layouts_count = push_constant_count;
+    shader_config.buffer_layouts = &output_buffer_layout;
+    shader_config.buffer_layouts_count = 1;
 
     sccl_shader_t shader;
     EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
               sccl_success);
 
+    /* run */
+    PushConstant push_constant = {};
+    push_constant.c_0 = 0;
+    push_constant.c_1 = 1;
+    push_constant.c_2 = 2;
+    push_constant.c_3 = 3;
+    sccl_shader_push_constant_binding_t
+        push_constant_bindings[push_constant_count];
+    push_constant_bindings[0].data = &push_constant;
+
+    sccl_shader_run_params_t params = {};
+    params.group_count_x = 1;
+    params.group_count_y = 1;
+    params.group_count_z = 1;
+    params.push_constant_bindings = push_constant_bindings;
+    params.push_constant_bindings_count = push_constant_count;
+    params.buffer_bindings = &output_buffer_binding;
+    params.buffer_bindings_count = 1;
+
+    EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+
+    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+
+    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+
+    /* verify output data */
+    EXPECT_EQ(sccl_host_map_buffer(output_buffer, (void **)&output_data, 0,
+                                   output_buffer_size),
+              sccl_success);
+    EXPECT_EQ(memcmp(output_data, &push_constant, sizeof(PushConstant)), 0);
+    sccl_host_unmap_buffer(output_buffer);
+
+    /* cleanup */
     sccl_destroy_shader(shader);
+    sccl_destroy_buffer(output_buffer);
 }
