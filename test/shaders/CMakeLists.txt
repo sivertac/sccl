@@ -17,3 +17,9 @@ compile_shader(
     ${CMAKE_CURRENT_SOURCE_DIR}/push_constants_shader.comp
     ${CMAKE_CURRENT_BINARY_DIR}/push_constants_shader.spv
 )
+
+compile_shader(
+    buffer_layout_shader
+    ${CMAKE_CURRENT_SOURCE_DIR}/buffer_layout_shader.comp
+    ${CMAKE_CURRENT_BINARY_DIR}/buffer_layout_shader.spv
+)

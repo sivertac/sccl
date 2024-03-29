@@ -6,6 +6,11 @@
 #include "error.h"
 #include <stdbool.h>
 
+typedef struct {
+    VkDescriptorPool descriptor_pool;
+    VkDescriptorSet descriptor_set;
+} descriptor_set_entry_t;
+
 static sccl_error_t reset_command_buffer(const sccl_stream_t stream)
 {
     CHECK_VKRESULT_RET(vkResetCommandBuffer(stream->command_buffer, 0));
@@ -17,6 +22,18 @@ static sccl_error_t reset_command_buffer(const sccl_stream_t stream)
     CHECK_VKRESULT_RET(
         vkBeginCommandBuffer(stream->command_buffer, &begin_info));
 
+    return sccl_success;
+}
+
+static sccl_error_t free_descriptor_sets(VkDevice device,
+                                         vector_t *descriptor_sets)
+{
+    for (size_t i = 0; i < vector_get_size(descriptor_sets); ++i) {
+        descriptor_set_entry_t *e = vector_get_element(descriptor_sets, i);
+        CHECK_VKRESULT_RET(vkFreeDescriptorSets(device, e->descriptor_pool, 1,
+                                                &e->descriptor_set));
+    }
+    vector_clear(descriptor_sets);
     return sccl_success;
 }
 
@@ -54,6 +71,10 @@ sccl_error_t sccl_create_stream(const sccl_device_t device,
     /* reset stream initially so command buffer starts recording */
     CHECK_SCCL_ERROR_RET(reset_command_buffer(stream_internal));
 
+    /* create descriptor set container */
+    CHECK_SCCL_ERROR_RET(vector_init(&stream_internal->descriptor_sets,
+                                     sizeof(descriptor_set_entry_t)));
+
     /* create fence */
     VkFenceCreateInfo fence_create_info = {0};
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -69,6 +90,10 @@ sccl_error_t sccl_create_stream(const sccl_device_t device,
 void sccl_destroy_stream(sccl_stream_t stream)
 {
     vkDestroyFence(stream->device->device, stream->fence, NULL);
+
+    free_descriptor_sets(stream->device->device, &stream->descriptor_sets);
+    vector_destroy(&stream->descriptor_sets);
+
     vkFreeCommandBuffers(stream->device->device, stream->command_pool, 1,
                          &stream->command_buffer);
     vkDestroyCommandPool(stream->device->device, stream->command_pool, NULL);
@@ -109,6 +134,9 @@ sccl_error_t sccl_join_stream(const sccl_stream_t stream)
     } while (res == VK_TIMEOUT);
     CHECK_VKRESULT_RET(res);
 
+    /* free descriptor sets */
+    free_descriptor_sets(stream->device->device, &stream->descriptor_sets);
+
     /* reset fence */
     CHECK_VKRESULT_RET(
         vkResetFences(stream->device->device, 1, &stream->fence));
@@ -142,4 +170,14 @@ sccl_error_t sccl_copy_buffer(const sccl_stream_t stream,
                          &memory_barrier, 0, NULL, 0, NULL);
 
     return sccl_success;
+}
+
+sccl_error_t add_descriptor_set_to_stream(const sccl_stream_t stream,
+                                          VkDescriptorPool descriptor_pool,
+                                          VkDescriptorSet descriptor_set)
+{
+    descriptor_set_entry_t entry = {0};
+    entry.descriptor_pool = descriptor_pool;
+    entry.descriptor_set = descriptor_set;
+    return vector_add_element(&stream->descriptor_sets, &entry);
 }

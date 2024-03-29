@@ -33,6 +33,8 @@ sccl_error_t vector_add_element(vector_t *vec, const void *element)
     return sccl_success;
 }
 
+void vector_clear(vector_t *vec) { vec->size = 0; }
+
 size_t vector_get_size(const vector_t *vec) { return vec->size; }
 
 void *vector_get_element(const vector_t *vec, size_t index)

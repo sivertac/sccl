@@ -40,11 +40,11 @@ typedef enum {
     sccl_buffer_type_shared_uniform = 6
 } sccl_buffer_type_t;
 
-typedef struct sccl_instance *sccl_instance_t; /* Opaque handle */
-typedef struct sccl_device *sccl_device_t;     /* Opaque handle */
-typedef struct sccl_buffer *sccl_buffer_t;     /* Opaque handle */
-typedef struct sccl_stream *sccl_stream_t;     /* Opaque handle */
-typedef struct sccl_shader *sccl_shader_t;     /* Opaque handle */
+typedef struct sccl_instance *sccl_instance_t; /* opaque handle */
+typedef struct sccl_device *sccl_device_t;     /* opaque handle */
+typedef struct sccl_buffer *sccl_buffer_t;     /* opaque handle */
+typedef struct sccl_stream *sccl_stream_t;     /* opaque handle */
+typedef struct sccl_shader *sccl_shader_t;     /* opaque handle */
 #define SCCL_NULL NULL
 
 typedef struct {
@@ -58,9 +58,6 @@ typedef struct {
 } sccl_shader_push_constant_layout_t;
 
 typedef struct {
-    /* index of constant to update, index is from order of push_constants set in
-     * `sccl_create_shader` */
-    size_t index;
     /* size of data is set in `sccl_shader_push_constant_layout_t`*/
     void *data;
 } sccl_shader_push_constant_binding_t;
@@ -167,7 +164,8 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
 
 void sccl_destroy_shader(sccl_shader_t shader);
 
-sccl_error_t sccl_run_shader(const sccl_shader_t shader,
+sccl_error_t sccl_run_shader(const sccl_stream_t stream,
+                             const sccl_shader_t shader,
                              const sccl_shader_run_params_t *params);
 
 #ifdef __cplusplus

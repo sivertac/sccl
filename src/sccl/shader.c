@@ -1,9 +1,11 @@
 
 #include "shader.h"
 #include "alloc.h"
+#include "buffer.h"
 #include "device.h"
 #include "error.h"
 #include "sccl.h"
+#include "stream.h"
 #include "vector.h"
 
 #include <inttypes.h>
@@ -169,10 +171,10 @@ count_buffer_types(const sccl_shader_buffer_layout_t *buffer_layouts,
         switch (
             sccl_buffer_type_to_vk_descriptor_type(buffer_layouts[i].type)) {
         case VK_DESCRIPTOR_TYPE_STORAGE_BUFFER:
-            ++storage_buffer_count;
+            ++(*storage_buffer_count);
             break;
         case VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER:
-            ++uniform_buffer_count;
+            ++(*uniform_buffer_count);
             break;
         default:
             assert(false);
@@ -276,6 +278,8 @@ static sccl_error_t create_descriptor_pool(VkDevice device,
     VkDescriptorPoolCreateInfo descriptor_pool_create_info = {0};
     descriptor_pool_create_info.sType =
         VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    descriptor_pool_create_info.flags =
+        VK_DESCRIPTOR_POOL_CREATE_FREE_DESCRIPTOR_SET_BIT;
     descriptor_pool_create_info.poolSizeCount =
         actual_descriptor_pool_sizes_count;
     descriptor_pool_create_info.pPoolSizes = descriptor_pool_sizes;
@@ -468,8 +472,93 @@ void sccl_destroy_shader(sccl_shader_t shader)
     vkDestroyShaderModule(shader->device, shader->shader_module, NULL);
 }
 
-// sccl_error_t sccl_run_shader(const sccl_shader_t shader, const
-// sccl_shader_run_params_t *params)
-//{
-//     return sccl_success;
-// }
+sccl_error_t sccl_run_shader(const sccl_stream_t stream,
+                             const sccl_shader_t shader,
+                             const sccl_shader_run_params_t *params)
+{
+
+    /* allocate descriptor set, store in stream, will be freed when stream is
+     * complete */
+    VkDescriptorSet *descriptor_sets;
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&descriptor_sets,
+                                     shader->descriptor_set_layouts_count,
+                                     sizeof(VkDescriptorSet)));
+    for (size_t i = 0; i < shader->descriptor_set_layouts_count; ++i) {
+        VkDescriptorSetAllocateInfo alloc_info = {0};
+        alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+        alloc_info.descriptorPool = shader->descriptor_pool;
+        alloc_info.descriptorSetCount = 1;
+        alloc_info.pSetLayouts = &shader->descriptor_set_layouts[i];
+        CHECK_VKRESULT_RET(vkAllocateDescriptorSets(
+            stream->device->device, &alloc_info, &descriptor_sets[i]));
+        CHECK_SCCL_ERROR_RET(add_descriptor_set_to_stream(
+            stream, shader->descriptor_pool, descriptor_sets[i]));
+    }
+
+    /* update descriptor sets */
+    VkWriteDescriptorSet *write_descriptor_sets;
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&write_descriptor_sets,
+                                     params->buffer_bindings_count,
+                                     sizeof(VkWriteDescriptorSet)));
+    VkDescriptorBufferInfo *descriptor_buffer_infos;
+    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&descriptor_buffer_infos,
+                                     params->buffer_bindings_count,
+                                     sizeof(VkDescriptorBufferInfo)));
+    for (size_t i = 0; i < params->buffer_bindings_count; ++i) {
+        descriptor_buffer_infos[i].buffer =
+            params->buffer_bindings[i].buffer->buffer;
+        descriptor_buffer_infos[i].offset = 0;
+        descriptor_buffer_infos[i].range = VK_WHOLE_SIZE;
+
+        write_descriptor_sets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+        write_descriptor_sets[i].dstSet =
+            descriptor_sets[params->buffer_bindings[i]
+                                .position.set]; /* descriptor sets should always
+                                                   be in order and contiguous */
+        write_descriptor_sets[i].dstBinding =
+            params->buffer_bindings[i].position.binding;
+        write_descriptor_sets[i].dstArrayElement = 0;
+        write_descriptor_sets[i].descriptorType =
+            sccl_buffer_type_to_vk_descriptor_type(
+                params->buffer_bindings[i].buffer->type);
+        write_descriptor_sets[i].descriptorCount = 1;
+        write_descriptor_sets[i].pBufferInfo = &descriptor_buffer_infos[i];
+    }
+    vkUpdateDescriptorSets(stream->device->device,
+                           params->buffer_bindings_count, write_descriptor_sets,
+                           0, NULL);
+    sccl_free(descriptor_buffer_infos);
+    sccl_free(write_descriptor_sets);
+
+    /* bind the compute pipeline */
+    vkCmdBindPipeline(stream->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                      shader->compute_pipeline);
+
+    /* bind descriptor sets */
+    if (shader->descriptor_set_layouts_count > 0) {
+        vkCmdBindDescriptorSets(
+            stream->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+            shader->pipeline_layout, 0, shader->descriptor_set_layouts_count,
+            descriptor_sets, 0, NULL);
+    }
+
+    /* dispatch the compute shader */
+    vkCmdDispatch(stream->command_buffer, params->group_count_x,
+                  params->group_count_y, params->group_count_z);
+
+    /* create barrier so next command will wait until this is finished */
+    VkMemoryBarrier memory_barrier = {0};
+    memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
+    memory_barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
+    memory_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
+    vkCmdPipelineBarrier(stream->command_buffer,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
+                         &memory_barrier, 0, NULL, 0, NULL);
+
+    /* cleanup */
+    sccl_free(descriptor_sets); /* vulkan handles will be destroyed when stream
+                                   is done executing */
+
+    return sccl_success;
+}
