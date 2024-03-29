@@ -293,3 +293,120 @@ TEST_F(shader_test, shader_push_constants)
     sccl_destroy_shader(shader);
     sccl_destroy_buffer(output_buffer);
 }
+
+TEST_F(shader_test, shader_copy_buffer)
+{
+    const size_t run_count =
+        2; /* number of times to rerun pipeline to test if stream can be used
+              again after running a pipeline */
+    const size_t buffer_element_count = 0x1000;
+    const size_t buffer_size = buffer_element_count * sizeof(uint32_t);
+    std::string shader_source =
+        read_test_shader("copy_buffer_shader.spv").value();
+
+    /* init buffers */
+    sccl_buffer_t host_input_buffer;
+    sccl_buffer_t host_output_buffer;
+    sccl_buffer_t device_input_buffer;
+    sccl_buffer_t device_output_buffer;
+    EXPECT_EQ(sccl_create_buffer(device, &host_input_buffer,
+                                 sccl_buffer_type_host, buffer_size),
+              sccl_success);
+    EXPECT_EQ(sccl_create_buffer(device, &host_output_buffer,
+                                 sccl_buffer_type_host, buffer_size),
+              sccl_success);
+    EXPECT_EQ(sccl_create_buffer(device, &device_input_buffer,
+                                 sccl_buffer_type_device, buffer_size),
+              sccl_success);
+    EXPECT_EQ(sccl_create_buffer(device, &device_output_buffer,
+                                 sccl_buffer_type_device, buffer_size),
+              sccl_success);
+    sccl_shader_buffer_position_t device_input_buffer_position = {};
+    device_input_buffer_position.set = 0;
+    device_input_buffer_position.binding = 0;
+    sccl_shader_buffer_layout_t device_input_buffer_layout = {};
+    device_input_buffer_layout.position = device_input_buffer_position;
+    device_input_buffer_layout.type = sccl_buffer_type_device;
+    sccl_shader_buffer_binding_t device_input_buffer_binding = {};
+    device_input_buffer_binding.position = device_input_buffer_position;
+    device_input_buffer_binding.buffer = device_input_buffer;
+    sccl_shader_buffer_position_t device_output_buffer_position = {};
+    device_output_buffer_position.set = 0;
+    device_output_buffer_position.binding = 1;
+    sccl_shader_buffer_layout_t device_output_buffer_layout = {};
+    device_output_buffer_layout.position = device_output_buffer_position;
+    device_output_buffer_layout.type = sccl_buffer_type_device;
+    sccl_shader_buffer_binding_t device_output_buffer_binding = {};
+    device_output_buffer_binding.position = device_output_buffer_position;
+    device_output_buffer_binding.buffer = device_output_buffer;
+
+    void *input_data;
+    void *output_data;
+    EXPECT_EQ(
+        sccl_host_map_buffer(host_input_buffer, &input_data, 0, buffer_size),
+        sccl_success);
+    EXPECT_EQ(
+        sccl_host_map_buffer(host_output_buffer, &output_data, 0, buffer_size),
+        sccl_success);
+
+    /* create shader */
+    sccl_shader_buffer_layout_t buffer_layouts[] = {
+        device_input_buffer_layout, device_output_buffer_layout};
+    sccl_shader_config_t shader_config = {};
+    shader_config.shader_source_code = shader_source.data();
+    shader_config.shader_source_code_length = shader_source.size();
+    shader_config.buffer_layouts = buffer_layouts;
+    shader_config.buffer_layouts_count = 2;
+    sccl_shader_t shader;
+    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
+              sccl_success);
+
+    /* run */
+    for (size_t run = 0; run < run_count; ++run) {
+
+        /* zero out host output buffer */
+        memset(output_data, 0, buffer_size);
+        /* set input data */
+        for (uint32_t i = 0; i < buffer_element_count; ++i) {
+            *(((uint32_t *)input_data) + i) = i;
+        }
+
+        EXPECT_EQ(sccl_copy_buffer(stream, host_input_buffer, 0,
+                                   device_input_buffer, 0, buffer_size),
+                  sccl_success);
+
+        sccl_shader_buffer_binding_t buffer_bindings[] = {
+            device_input_buffer_binding, device_output_buffer_binding};
+        sccl_shader_run_params_t params = {};
+        params.group_count_x = buffer_element_count;
+        params.group_count_y = 1;
+        params.group_count_z = 1;
+        params.buffer_bindings = buffer_bindings;
+        params.buffer_bindings_count = 2;
+        EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+
+        EXPECT_EQ(sccl_copy_buffer(stream, device_output_buffer, 0,
+                                   host_output_buffer, 0, buffer_size),
+                  sccl_success);
+
+        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+
+        EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+
+        /* verify output data */
+        for (uint32_t i = 0; i < buffer_element_count; ++i) {
+            *(((uint32_t *)input_data) + i) = i;
+
+            EXPECT_EQ(*(((uint32_t *)output_data) + i), i / 2);
+        }
+    }
+
+    /* cleanup */
+    sccl_destroy_shader(shader);
+    sccl_host_unmap_buffer(host_input_buffer);
+    sccl_host_unmap_buffer(host_output_buffer);
+    sccl_destroy_buffer(host_input_buffer);
+    sccl_destroy_buffer(host_output_buffer);
+    sccl_destroy_buffer(device_input_buffer);
+    sccl_destroy_buffer(device_output_buffer);
+}

@@ -158,8 +158,9 @@ sccl_buffer_type_to_vk_descriptor_type(const sccl_buffer_type_t type)
     case sccl_buffer_type_shared_uniform:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     default:
-        assert(false);
     }
+    assert(false);
+    return 0;
 }
 
 static void

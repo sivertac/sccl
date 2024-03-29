@@ -7,6 +7,12 @@ compile_shader(
 )
 
 compile_shader(
+    buffer_layout_shader
+    ${CMAKE_CURRENT_SOURCE_DIR}/buffer_layout_shader.comp
+    ${CMAKE_CURRENT_BINARY_DIR}/buffer_layout_shader.spv
+)
+
+compile_shader(
     specialization_constants_shader
     ${CMAKE_CURRENT_SOURCE_DIR}/specialization_constants_shader.comp
     ${CMAKE_CURRENT_BINARY_DIR}/specialization_constants_shader.spv
@@ -19,7 +25,7 @@ compile_shader(
 )
 
 compile_shader(
-    buffer_layout_shader
-    ${CMAKE_CURRENT_SOURCE_DIR}/buffer_layout_shader.comp
-    ${CMAKE_CURRENT_BINARY_DIR}/buffer_layout_shader.spv
+    copy_buffer_shader
+    ${CMAKE_CURRENT_SOURCE_DIR}/copy_buffer_shader.comp
+    ${CMAKE_CURRENT_BINARY_DIR}/copy_buffer_shader.spv
 )
