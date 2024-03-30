@@ -103,6 +103,38 @@ typedef struct {
 } sccl_shader_run_params_t;
 
 /**
+ * Struct containing various device properties queried from vulkan.
+ */
+typedef struct {
+    uint32_t max_work_group_count
+        [3]; /* index: `0 = x, 1 = y, 2 = z`.
+                `maxComputeWorkGroupCount` from
+                https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+              */
+    uint32_t max_work_group_size
+        [3]; /* index: `0 = x, 1 = y, 2 = z`.
+                `maxComputeWorkGroupSize` from
+                https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+              */
+    uint32_t
+        native_workgroup_size; /* `subgroupSize` from
+                                  https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupProperties.html
+                                */
+    uint32_t
+        max_storage_buffer_size; /* `maxStorageBufferRange` from
+                                    https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+                                  */
+    uint32_t
+        max_uniform_buffer_size; /* `maxUniformBufferRange` from
+                                    https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+                                  */
+    uint32_t
+        max_push_constant_size; /*  `maxPushConstantsSize` from
+                                   https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+                                 */
+} sccl_device_properties_t;
+
+/**
  * To enable validation layers, set enviroment variable
  * `SCCL_ENABLE_VALIDATION_LAYERS=1`
  *
@@ -152,6 +184,14 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
  * @param device Device.
  */
 void sccl_destroy_device(sccl_device_t device);
+
+/**
+ * Get device properties.
+ * @param device Device.
+ * @param device_properties Device properties returned.
+ */
+void sccl_get_device_properties(const sccl_device_t device,
+                                sccl_device_properties_t *device_properties);
 
 /**
  * Create buffer on device.

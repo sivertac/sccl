@@ -4,6 +4,7 @@
 #include "error.h"
 #include "instance.h"
 #include <stdbool.h>
+#include <string.h>
 
 static sccl_error_t
 get_physical_device_at_index(const sccl_instance_t instance,
@@ -129,4 +130,38 @@ void sccl_destroy_device(sccl_device_t device)
     vkDestroyDevice(device->device, NULL);
 
     sccl_free(device);
+}
+
+void sccl_get_device_properties(const sccl_device_t device,
+                                sccl_device_properties_t *device_properties)
+{
+    memset(device_properties, 0, sizeof(sccl_device_properties_t));
+
+    VkPhysicalDeviceSubgroupProperties physical_device_subgroup_properties = {};
+    physical_device_subgroup_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
+    VkPhysicalDeviceProperties2 physical_device_properties = {};
+    physical_device_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    physical_device_properties.pNext = &physical_device_subgroup_properties;
+    vkGetPhysicalDeviceProperties2(device->physical_device,
+                                   &physical_device_properties);
+    for (size_t i = 0; i < 3; ++i) {
+        device_properties->max_work_group_count[i] =
+            physical_device_properties.properties.limits
+                .maxComputeWorkGroupCount[i];
+    }
+    for (size_t i = 0; i < 3; ++i) {
+        device_properties->max_work_group_size[i] =
+            physical_device_properties.properties.limits
+                .maxComputeWorkGroupSize[i];
+    }
+    device_properties->native_workgroup_size =
+        physical_device_subgroup_properties.subgroupSize;
+    device_properties->max_storage_buffer_size =
+        physical_device_properties.properties.limits.maxStorageBufferRange;
+    device_properties->max_uniform_buffer_size =
+        physical_device_properties.properties.limits.maxUniformBufferRange;
+    device_properties->max_push_constant_size =
+        physical_device_properties.properties.limits.maxPushConstantsSize;
 }
