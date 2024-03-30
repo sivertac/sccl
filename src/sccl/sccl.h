@@ -113,6 +113,12 @@ typedef struct {
 #define SCCL_ASSERT_ON_VALIDATION_ERROR "SCCL_ASSERT_ON_VALIDATION_ERROR"
 
 /**
+ * Get error string.
+ * @param error Error.
+ */
+const char *sccl_get_error_string(sccl_error_t error);
+
+/**
  * Create instance.
  * @param instance Instance.
  */

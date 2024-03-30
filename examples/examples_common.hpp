@@ -21,6 +21,7 @@
 #define UNWRAP_SCCL_ERROR(error)                                               \
     do {                                                                       \
         if (error != sccl_success) {                                           \
+            fprintf(stderr, "SCCL error: %s\n", sccl_get_error_string(error)); \
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)

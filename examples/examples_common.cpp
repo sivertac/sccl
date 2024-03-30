@@ -14,34 +14,6 @@ void print_data_buffer(const sccl_buffer_t buffer, size_t size)
     sccl_host_unmap_buffer(buffer);
 }
 
-/*
-void print_data_buffers(const ComputeDevice *compute_device,
-                        size_t num_elements, VkDeviceMemory input_buffer_memory,
-                        VkDeviceMemory output_buffer_memory)
-{
-    VkDeviceSize buffer_size = sizeof(int) * num_elements;
-
-    // Map and fill the buffers
-    void *inputDataPtr;
-    void *outputDataPtr;
-
-    vkMapMemory(compute_device->m_device, input_buffer_memory, 0, buffer_size,
-                0, &inputDataPtr);
-    vkMapMemory(compute_device->m_device, output_buffer_memory, 0, buffer_size,
-                0, &outputDataPtr);
-
-    // Print inputDataPtr and outputDataPtr
-    std::cout << "Input buffer:" << std::endl;
-    print_buffer_binary_xxd((const char *)inputDataPtr, buffer_size);
-
-    std::cout << "Output buffer:" << std::endl;
-    print_buffer_binary_xxd((const char *)outputDataPtr, buffer_size);
-
-    vkUnmapMemory(compute_device->m_device, input_buffer_memory);
-    vkUnmapMemory(compute_device->m_device, output_buffer_memory);
-}
-*/
-
 std::optional<std::string> read_file(const char *filepath)
 {
     // Read the shader code from the file
