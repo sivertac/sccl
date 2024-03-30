@@ -1,5 +1,3 @@
-# Vulkan Compute Shader Test
-
 # SCCL
 Sivert Collective Compute Library (SCCL) is a wrapper library for simplifying writing compute applications in Vulkan.
 

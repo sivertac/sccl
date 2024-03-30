@@ -3,12 +3,10 @@
 #define EXMAPLES_COMMON_HEADER
 
 #include <binary_util.hpp>
-#include <compute_interface.h>
-#include <sccl.h>
-#include <vulkan/vk_enum_string_helper.h>
-
 #include <optional>
+#include <sccl.h>
 #include <type_traits>
+#include <vulkan/vk_enum_string_helper.h>
 
 #define UNWRAP_VKRESULT(result)                                                \
     do {                                                                       \
