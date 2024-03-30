@@ -313,6 +313,8 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
                                 sccl_shader_t *shader,
                                 const sccl_shader_config_t *config)
 {
+    sccl_error_t error;
+
     /* validate config */
     CHECK_SCCL_NULL_RET(config);
     CHECK_SCCL_NULL_RET(config->shader_source_code);
@@ -321,9 +323,10 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     }
 
     /* create internal handle */
-    struct sccl_shader *shader_internal;
-    CHECK_SCCL_ERROR_RET(
-        sccl_calloc((void **)&shader_internal, 1, sizeof(struct sccl_shader)));
+    struct sccl_shader *shader_internal = NULL;
+    CHECK_SCCL_ERROR_GOTO(
+        sccl_calloc((void **)&shader_internal, 1, sizeof(struct sccl_shader)),
+        error_return, error);
 
     shader_internal->device = device->device;
 
@@ -334,17 +337,20 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     shader_module_create_info.codeSize = config->shader_source_code_length;
     shader_module_create_info.pCode =
         (const uint32_t *)config->shader_source_code;
-    CHECK_VKRESULT_RET(
+    CHECK_VKRESULT_GOTO(
         vkCreateShaderModule(device->device, &shader_module_create_info,
-                             VK_NULL_HANDLE, &shader_internal->shader_module));
+                             VK_NULL_HANDLE, &shader_internal->shader_module),
+        error_return, error);
 
     /* create descriptor set layout based on provided config */
     if (config->buffer_layouts != NULL) {
-        CHECK_SCCL_ERROR_RET(create_descriptor_set_layouts(
-            shader_internal->device, config->buffer_layouts,
-            config->buffer_layouts_count,
-            &shader_internal->descriptor_set_layouts,
-            &shader_internal->descriptor_set_layouts_count));
+        CHECK_SCCL_ERROR_GOTO(
+            create_descriptor_set_layouts(
+                shader_internal->device, config->buffer_layouts,
+                config->buffer_layouts_count,
+                &shader_internal->descriptor_set_layouts,
+                &shader_internal->descriptor_set_layouts_count),
+            error_return, error);
     }
 
     /* create descriptor pool */
@@ -353,10 +359,12 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     count_buffer_types(config->buffer_layouts, config->buffer_layouts_count,
                        &storage_buffer_count, &uniform_buffer_count);
     if (storage_buffer_count > 0 || uniform_buffer_count > 0) {
-        CHECK_SCCL_ERROR_RET(create_descriptor_pool(
-            shader_internal->device, storage_buffer_count, uniform_buffer_count,
-            shader_internal->descriptor_set_layouts_count,
-            &shader_internal->descriptor_pool));
+        CHECK_SCCL_ERROR_GOTO(create_descriptor_pool(
+                                  shader_internal->device, storage_buffer_count,
+                                  uniform_buffer_count,
+                                  shader_internal->descriptor_set_layouts_count,
+                                  &shader_internal->descriptor_pool),
+                              error_return, error);
     }
 
     /* prepare specialization info */
@@ -364,7 +372,8 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     if (!verify_specialization_constants(
             config->specialization_constants,
             config->specialization_constants_count)) {
-        return sccl_invalid_argument;
+        error = sccl_invalid_argument;
+        goto error_return;
     }
     /* count total data size (in bytes) */
     size_t total_specialization_constant_size = 0;
@@ -373,14 +382,16 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
             config->specialization_constants[i].size;
     }
     /* allocate specialization data memory and entries */
-    void *specialization_data;
-    CHECK_SCCL_ERROR_RET(sccl_calloc(&specialization_data,
-                                     total_specialization_constant_size,
-                                     sizeof(uint8_t)));
-    VkSpecializationMapEntry *specialization_map_entries;
-    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&specialization_map_entries,
-                                     config->specialization_constants_count,
-                                     sizeof(VkSpecializationMapEntry)));
+    void *specialization_data = NULL;
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc(&specialization_data,
+                                      total_specialization_constant_size,
+                                      sizeof(uint8_t)),
+                          error_return, error);
+    VkSpecializationMapEntry *specialization_map_entries = NULL;
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&specialization_map_entries,
+                                      config->specialization_constants_count,
+                                      sizeof(VkSpecializationMapEntry)),
+                          error_return, error);
     /* init entries and copy data */
     size_t offset = 0;
     for (size_t i = 0; i < config->specialization_constants_count; ++i) {
@@ -403,9 +414,10 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     /* create push constant range for each entry */
     VkPushConstantRange *push_constant_ranges = NULL;
     if (config->push_constant_layouts_count > 0) {
-        CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&push_constant_ranges,
-                                         config->push_constant_layouts_count,
-                                         sizeof(VkPushConstantRange)));
+        CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&push_constant_ranges,
+                                          config->push_constant_layouts_count,
+                                          sizeof(VkPushConstantRange)),
+                              error_return, error);
         for (size_t i = 0; i < config->push_constant_layouts_count; ++i) {
             push_constant_ranges[i].offset = 0;
             push_constant_ranges[i].size =
@@ -416,10 +428,11 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
          * command buffer */
         shader_internal->push_constant_layouts_count =
             config->push_constant_layouts_count;
-        CHECK_SCCL_ERROR_RET(
+        CHECK_SCCL_ERROR_GOTO(
             sccl_calloc((void **)&shader_internal->push_constant_layouts,
                         shader_internal->push_constant_layouts_count,
-                        sizeof(sccl_shader_push_constant_layout_t)));
+                        sizeof(sccl_shader_push_constant_layout_t)),
+            error_return, error);
         memcpy(shader_internal->push_constant_layouts,
                config->push_constant_layouts,
                shader_internal->push_constant_layouts_count *
@@ -437,9 +450,10 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     pipeline_layout_create_info.pPushConstantRanges = push_constant_ranges;
     pipeline_layout_create_info.pushConstantRangeCount =
         config->push_constant_layouts_count;
-    CHECK_VKRESULT_RET(
+    CHECK_VKRESULT_GOTO(
         vkCreatePipelineLayout(device->device, &pipeline_layout_create_info,
-                               NULL, &shader_internal->pipeline_layout));
+                               NULL, &shader_internal->pipeline_layout),
+        error_return, error);
 
     VkPipelineShaderStageCreateInfo pipeline_shader_stage_create_info = {0};
     pipeline_shader_stage_create_info.sType =
@@ -455,9 +469,11 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
         VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO;
     compute_pipeline_create_info.layout = shader_internal->pipeline_layout;
     compute_pipeline_create_info.stage = pipeline_shader_stage_create_info;
-    CHECK_VKRESULT_RET(vkCreateComputePipelines(
-        device->device, NULL, 1, &compute_pipeline_create_info, NULL,
-        &shader_internal->compute_pipeline));
+    CHECK_VKRESULT_GOTO(
+        vkCreateComputePipelines(device->device, NULL, 1,
+                                 &compute_pipeline_create_info, NULL,
+                                 &shader_internal->compute_pipeline),
+        error_return, error);
 
     /* set public handle */
     *shader = (sccl_shader_t)shader_internal;
@@ -468,6 +484,51 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     sccl_free(specialization_data);
 
     return sccl_success;
+
+error_return:
+    if (push_constant_ranges != NULL) {
+        sccl_free(push_constant_ranges);
+    }
+    if (specialization_map_entries != NULL) {
+        sccl_free(specialization_map_entries);
+    }
+    if (specialization_data != NULL) {
+        sccl_free(specialization_data);
+    }
+
+    if (shader_internal != NULL) {
+        if (shader_internal->compute_pipeline != VK_NULL_HANDLE) {
+            vkDestroyPipeline(device->device, shader_internal->compute_pipeline,
+                              NULL);
+        }
+        if (shader_internal->pipeline_layout != VK_NULL_HANDLE) {
+            vkDestroyPipelineLayout(device->device,
+                                    shader_internal->pipeline_layout, NULL);
+        }
+        if (shader_internal->push_constant_layouts != NULL) {
+            sccl_free(shader_internal->push_constant_layouts);
+        }
+        if (shader_internal->descriptor_pool != VK_NULL_HANDLE) {
+            vkDestroyDescriptorPool(device->device,
+                                    shader_internal->descriptor_pool, NULL);
+        }
+        if (shader_internal->descriptor_set_layouts != NULL) {
+            for (size_t i = 0;
+                 i < shader_internal->descriptor_set_layouts_count; ++i) {
+                vkDestroyDescriptorSetLayout(
+                    device->device, shader_internal->descriptor_set_layouts[i],
+                    NULL);
+            }
+            sccl_free(shader_internal->descriptor_set_layouts);
+        }
+        if (shader_internal->shader_module != VK_NULL_HANDLE) {
+            vkDestroyShaderModule(device->device,
+                                  shader_internal->shader_module, NULL);
+        }
+        sccl_free(shader_internal);
+    }
+
+    return error;
 }
 
 void sccl_destroy_shader(sccl_shader_t shader)
@@ -479,7 +540,7 @@ void sccl_destroy_shader(sccl_shader_t shader)
         sccl_free(shader->push_constant_layouts);
     }
 
-    if (shader->descriptor_pool != NULL) {
+    if (shader->descriptor_pool != VK_NULL_HANDLE) {
         vkDestroyDescriptorPool(shader->device, shader->descriptor_pool, NULL);
     }
     if (shader->descriptor_set_layouts != NULL) {
@@ -491,12 +552,15 @@ void sccl_destroy_shader(sccl_shader_t shader)
     }
 
     vkDestroyShaderModule(shader->device, shader->shader_module, NULL);
+
+    sccl_free(shader);
 }
 
 sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                              const sccl_shader_t shader,
                              const sccl_shader_run_params_t *params)
 {
+    sccl_error_t error = sccl_success;
 
     /* validate */
     /* check if push constants are in range */
@@ -508,30 +572,41 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
     /* allocate descriptor set, store in stream, will be freed when stream is
      * complete */
     VkDescriptorSet *descriptor_sets = NULL;
-    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&descriptor_sets,
-                                     shader->descriptor_set_layouts_count,
-                                     sizeof(VkDescriptorSet)));
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&descriptor_sets,
+                                      shader->descriptor_set_layouts_count,
+                                      sizeof(VkDescriptorSet)),
+                          error_return, error);
     for (size_t i = 0; i < shader->descriptor_set_layouts_count; ++i) {
         VkDescriptorSetAllocateInfo alloc_info = {0};
         alloc_info.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
         alloc_info.descriptorPool = shader->descriptor_pool;
         alloc_info.descriptorSetCount = 1;
         alloc_info.pSetLayouts = &shader->descriptor_set_layouts[i];
-        CHECK_VKRESULT_RET(vkAllocateDescriptorSets(
-            stream->device->device, &alloc_info, &descriptor_sets[i]));
-        CHECK_SCCL_ERROR_RET(add_descriptor_set_to_stream(
-            stream, shader->descriptor_pool, descriptor_sets[i]));
+        CHECK_VKRESULT_GOTO(vkAllocateDescriptorSets(stream->device->device,
+                                                     &alloc_info,
+                                                     &descriptor_sets[i]),
+                            error_return, error);
+    }
+    /* add to stream after all sets are allocated, so we don't have to clean up
+     * in case one allocation fails */
+    for (size_t i = 0; i < shader->descriptor_set_layouts_count; ++i) {
+        CHECK_SCCL_ERROR_GOTO(
+            add_descriptor_set_to_stream(stream, shader->descriptor_pool,
+                                         descriptor_sets[i]),
+            error_return, error);
     }
 
     /* update descriptor sets */
-    VkWriteDescriptorSet *write_descriptor_sets;
-    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&write_descriptor_sets,
-                                     params->buffer_bindings_count,
-                                     sizeof(VkWriteDescriptorSet)));
-    VkDescriptorBufferInfo *descriptor_buffer_infos;
-    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&descriptor_buffer_infos,
-                                     params->buffer_bindings_count,
-                                     sizeof(VkDescriptorBufferInfo)));
+    VkWriteDescriptorSet *write_descriptor_sets = NULL;
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&write_descriptor_sets,
+                                      params->buffer_bindings_count,
+                                      sizeof(VkWriteDescriptorSet)),
+                          error_return, error);
+    VkDescriptorBufferInfo *descriptor_buffer_infos = NULL;
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&descriptor_buffer_infos,
+                                      params->buffer_bindings_count,
+                                      sizeof(VkDescriptorBufferInfo)),
+                          error_return, error);
     for (size_t i = 0; i < params->buffer_bindings_count; ++i) {
         descriptor_buffer_infos[i].buffer =
             params->buffer_bindings[i].buffer->buffer;
@@ -601,4 +676,17 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                                    is done executing */
 
     return sccl_success;
+
+error_return:
+    if (descriptor_buffer_infos != NULL) {
+        sccl_free(descriptor_buffer_infos);
+    }
+    if (write_descriptor_sets != NULL) {
+        sccl_free(write_descriptor_sets);
+    }
+    if (descriptor_sets != NULL) {
+        sccl_free(descriptor_sets);
+    }
+
+    return error;
 }

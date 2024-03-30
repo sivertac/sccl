@@ -28,10 +28,12 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
                                 sccl_buffer_t *buffer, sccl_buffer_type_t type,
                                 size_t size)
 {
+    sccl_error_t error = sccl_success;
 
-    struct sccl_buffer *buffer_internal;
-    CHECK_SCCL_ERROR_RET(
-        sccl_calloc((void **)&buffer_internal, 1, sizeof(struct sccl_buffer)));
+    struct sccl_buffer *buffer_internal = NULL;
+    CHECK_SCCL_ERROR_GOTO(
+        sccl_calloc((void **)&buffer_internal, 1, sizeof(struct sccl_buffer)),
+        error_return, error);
 
     buffer_internal->type = type;
     buffer_internal->device = device->device;
@@ -62,8 +64,9 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     buffer_info.size = size;
     buffer_info.usage = buffer_usage_flags;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    CHECK_VKRESULT_RET(vkCreateBuffer(buffer_internal->device, &buffer_info,
-                                      NULL, &buffer_internal->buffer));
+    CHECK_VKRESULT_GOTO(vkCreateBuffer(buffer_internal->device, &buffer_info,
+                                       NULL, &buffer_internal->buffer),
+                        error_return, error);
 
     /* get memory requirements */
     VkMemoryRequirements mem_requirements = {0};
@@ -94,27 +97,44 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
 
     /* find memory type */
     uint32_t memory_type_index;
-    CHECK_SCCL_ERROR_RET(find_memory_type(
-        device->physical_device, mem_requirements.memoryTypeBits,
-        memory_property_flags, &memory_type_index));
+    CHECK_SCCL_ERROR_GOTO(find_memory_type(device->physical_device,
+                                           mem_requirements.memoryTypeBits,
+                                           memory_property_flags,
+                                           &memory_type_index),
+                          error_return, error);
 
     /* allocate memory */
     VkMemoryAllocateInfo alloc_info = {0};
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = mem_requirements.size;
     alloc_info.memoryTypeIndex = memory_type_index;
-    CHECK_VKRESULT_RET(vkAllocateMemory(device->device, &alloc_info, NULL,
-                                        &buffer_internal->device_memory));
+    CHECK_VKRESULT_GOTO(vkAllocateMemory(device->device, &alloc_info, NULL,
+                                         &buffer_internal->device_memory),
+                        error_return, error);
 
     /* bind */
-    CHECK_VKRESULT_RET(vkBindBufferMemory(buffer_internal->device,
-                                          buffer_internal->buffer,
-                                          buffer_internal->device_memory, 0));
+    CHECK_VKRESULT_GOTO(vkBindBufferMemory(buffer_internal->device,
+                                           buffer_internal->buffer,
+                                           buffer_internal->device_memory, 0),
+                        error_return, error);
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;
 
     return sccl_success;
+
+error_return:
+    if (buffer_internal != NULL) {
+        if (buffer_internal->device_memory != VK_NULL_HANDLE) {
+            vkFreeMemory(device->device, buffer_internal->device_memory, NULL);
+        }
+        if (buffer_internal->buffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device->device, buffer_internal->buffer, NULL);
+        }
+        sccl_free(buffer_internal);
+    }
+
+    return error;
 }
 
 void sccl_destroy_buffer(sccl_buffer_t buffer)

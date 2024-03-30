@@ -36,3 +36,12 @@ TEST_F(device_test, create_device)
 
     sccl_destroy_device(device);
 }
+
+TEST_F(device_test, create_device_invalid_index)
+{
+    uint32_t device_count;
+    EXPECT_EQ(sccl_get_device_count(instance, &device_count), sccl_success);
+    sccl_device_t device;
+    EXPECT_NE(sccl_create_device(instance, &device, device_count + 1),
+              sccl_success);
+}

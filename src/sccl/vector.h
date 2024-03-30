@@ -16,6 +16,8 @@ typedef struct {
 
 sccl_error_t vector_init(vector_t *vec, size_t element_size);
 
+bool vector_is_initilized(vector_t *vec);
+
 sccl_error_t vector_add_element(vector_t *vec, const void *element);
 
 void vector_clear(vector_t *vec);

@@ -13,6 +13,8 @@ sccl_error_t vector_init(vector_t *vec, size_t element_size)
     return sccl_calloc(&vec->data, vec->capacity, vec->element_size);
 }
 
+bool vector_is_initilized(vector_t *vec) { return vec->data != NULL; }
+
 static void *get_element_internal(const vector_t *vec, size_t index)
 {
     return (void *)(((uint8_t *)vec->data) + index * vec->element_size);

@@ -87,7 +87,7 @@ static sccl_error_t check_validation_layer_support(bool *supported)
     uint32_t layer_count;
     CHECK_VKRESULT_RET(vkEnumerateInstanceLayerProperties(&layer_count, NULL));
 
-    VkLayerProperties *available_layers;
+    VkLayerProperties *available_layers = NULL;
     CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&available_layers, layer_count,
                                      sizeof(VkLayerProperties)));
 
@@ -143,13 +143,16 @@ static sccl_error_t update_physical_device_list(sccl_instance_t instance)
 
 sccl_error_t sccl_create_instance(sccl_instance_t *instance)
 {
-    struct sccl_instance *instance_internal;
-    CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&instance_internal, 1,
-                                     sizeof(struct sccl_instance)));
+    sccl_error_t error = sccl_success;
+
+    struct sccl_instance *instance_internal = NULL;
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&instance_internal, 1,
+                                      sizeof(struct sccl_instance)),
+                          error_return, error);
 
     VkApplicationInfo app_info = {0};
     app_info.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-    app_info.pApplicationName = "Compute Shader Meme";
+    app_info.pApplicationName = "SCCL Application";
     app_info.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
     app_info.pEngineName = "SCCL";
     app_info.engineVersion = VK_MAKE_VERSION(1, 0, 0);
@@ -165,7 +168,8 @@ sccl_error_t sccl_create_instance(sccl_instance_t *instance)
         printf("Enabling validation layers\n");
 
         bool supported;
-        CHECK_SCCL_ERROR_RET(check_validation_layer_support(&supported));
+        CHECK_SCCL_ERROR_GOTO(check_validation_layer_support(&supported),
+                              error_return, error);
         if (!supported) {
             return sccl_unsupported_error;
         }
@@ -176,21 +180,45 @@ sccl_error_t sccl_create_instance(sccl_instance_t *instance)
         create_info.ppEnabledLayerNames = validation_layers;
     }
 
-    CHECK_VKRESULT_RET(
-        vkCreateInstance(&create_info, NULL, &instance_internal->instance));
+    CHECK_VKRESULT_GOTO(
+        vkCreateInstance(&create_info, NULL, &instance_internal->instance),
+        error_return, error);
 
     if (is_enable_validation_layers_set()) {
-        CHECK_VKRESULT_RET(setup_debug_messenger(
-            instance_internal->instance, &instance_internal->debug_messenger));
+        CHECK_VKRESULT_GOTO(
+            setup_debug_messenger(instance_internal->instance,
+                                  &instance_internal->debug_messenger),
+            error_return, error);
     }
 
     /* populate physical device list */
-    CHECK_SCCL_ERROR_RET(update_physical_device_list(instance_internal));
+    CHECK_SCCL_ERROR_GOTO(update_physical_device_list(instance_internal),
+                          error_return, error);
 
     /* set public handle */
     *instance = (sccl_instance_t)instance_internal;
 
     return sccl_success;
+
+error_return:
+    if (instance_internal != NULL) {
+        if (instance_internal->physical_devices != NULL) {
+            sccl_free(instance_internal->physical_devices);
+        }
+
+        if (is_enable_validation_layers_set() &&
+            instance_internal->debug_messenger != VK_NULL_HANDLE) {
+            destroy_debug_utils_messenger_ext(
+                instance_internal->instance, instance_internal->debug_messenger,
+                NULL);
+        }
+        if (instance_internal->instance != VK_NULL_HANDLE) {
+            vkDestroyInstance(instance_internal->instance, NULL);
+        }
+        sccl_free(instance_internal);
+    }
+
+    return error;
 }
 
 void sccl_destroy_instance(sccl_instance_t instance)
@@ -206,7 +234,7 @@ void sccl_destroy_instance(sccl_instance_t instance)
 
     vkDestroyInstance(instance->instance, NULL);
 
-    sccl_free((void *)instance);
+    sccl_free(instance);
 }
 
 sccl_error_t sccl_get_device_count(const sccl_instance_t instance,

@@ -23,11 +23,31 @@
         }                                                                      \
     } while (0)
 
+/* Check `VkResult`, if success then continue, else goto `goto_label`, , store
+ * sccl error in `store_sccl_error` if error */
+#define CHECK_VKRESULT_GOTO(result, goto_label, store_sccl_error)              \
+    do {                                                                       \
+        if (result != VK_SUCCESS) {                                            \
+            store_sccl_error = sccl_unhandled_vulkan_error;                    \
+            goto goto_label;                                                   \
+        }                                                                      \
+    } while (0)
+
 /* Check `sccl_error_t`, if success then continue, else return error */
 #define CHECK_SCCL_ERROR_RET(error)                                            \
     do {                                                                       \
         if (error != sccl_success) {                                           \
             return error;                                                      \
+        }                                                                      \
+    } while (0)
+
+/* Check `sccl_error_t`, if success then continue, else goto `goto_label`, store
+ * sccl error in `store_sccl_error` if error */
+#define CHECK_SCCL_ERROR_GOTO(error, goto_label, store_sccl_error)             \
+    do {                                                                       \
+        if (error != sccl_success) {                                           \
+            store_sccl_error = error;                                          \
+            goto goto_label;                                                   \
         }                                                                      \
     } while (0)
 

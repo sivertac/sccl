@@ -40,10 +40,12 @@ static sccl_error_t free_descriptor_sets(VkDevice device,
 sccl_error_t sccl_create_stream(const sccl_device_t device,
                                 sccl_stream_t *stream)
 {
+    sccl_error_t error = sccl_success;
 
-    struct sccl_stream *stream_internal;
-    CHECK_SCCL_ERROR_RET(
-        sccl_calloc((void **)&stream_internal, 1, sizeof(struct sccl_stream)));
+    struct sccl_stream *stream_internal = NULL;
+    CHECK_SCCL_ERROR_GOTO(
+        sccl_calloc((void **)&stream_internal, 1, sizeof(struct sccl_stream)),
+        error_return, error);
 
     stream_internal->device = device;
 
@@ -53,9 +55,10 @@ sccl_error_t sccl_create_stream(const sccl_device_t device,
     command_pool_create_info.flags =
         VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-    CHECK_VKRESULT_RET(vkCreateCommandPool(device->device,
-                                           &command_pool_create_info, NULL,
-                                           &stream_internal->command_pool));
+    CHECK_VKRESULT_GOTO(vkCreateCommandPool(device->device,
+                                            &command_pool_create_info, NULL,
+                                            &stream_internal->command_pool),
+                        error_return, error);
 
     VkCommandBufferAllocateInfo command_buffer_allocate_info = {0};
     command_buffer_allocate_info.sType =
@@ -64,27 +67,55 @@ sccl_error_t sccl_create_stream(const sccl_device_t device,
     command_buffer_allocate_info.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     command_buffer_allocate_info.commandBufferCount = 1;
 
-    CHECK_VKRESULT_RET(
+    CHECK_VKRESULT_GOTO(
         vkAllocateCommandBuffers(device->device, &command_buffer_allocate_info,
-                                 &stream_internal->command_buffer));
+                                 &stream_internal->command_buffer),
+        error_return, error);
 
     /* reset stream initially so command buffer starts recording */
-    CHECK_SCCL_ERROR_RET(reset_command_buffer(stream_internal));
+    CHECK_SCCL_ERROR_GOTO(reset_command_buffer(stream_internal), error_return,
+                          error);
 
     /* create descriptor set container */
-    CHECK_SCCL_ERROR_RET(vector_init(&stream_internal->descriptor_sets,
-                                     sizeof(descriptor_set_entry_t)));
+    CHECK_SCCL_ERROR_GOTO(vector_init(&stream_internal->descriptor_sets,
+                                      sizeof(descriptor_set_entry_t)),
+                          error_return, error);
 
     /* create fence */
     VkFenceCreateInfo fence_create_info = {0};
     fence_create_info.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    CHECK_VKRESULT_RET(vkCreateFence(device->device, &fence_create_info, NULL,
-                                     &stream_internal->fence));
+    CHECK_VKRESULT_GOTO(vkCreateFence(device->device, &fence_create_info, NULL,
+                                      &stream_internal->fence),
+                        error_return, error);
 
     /* set public handle */
     *stream = (sccl_stream_t)stream_internal;
 
     return sccl_success;
+
+error_return:
+    if (stream_internal != NULL) {
+        if (stream_internal->fence != VK_NULL_HANDLE) {
+            vkDestroyFence(device->device, stream_internal->fence, NULL);
+        }
+        if (vector_is_initilized(&stream_internal->descriptor_sets)) {
+            free_descriptor_sets(device->device,
+                                 &stream_internal->descriptor_sets);
+            vector_destroy(&stream_internal->descriptor_sets);
+        }
+        if (stream_internal->command_pool != VK_NULL_HANDLE) {
+            if (stream_internal->command_buffer != VK_NULL_HANDLE) {
+                vkFreeCommandBuffers(device->device,
+                                     stream_internal->command_pool, 1,
+                                     &stream_internal->command_buffer);
+            }
+            vkDestroyCommandPool(device->device, stream_internal->command_pool,
+                                 NULL);
+        }
+        sccl_free(stream_internal);
+    }
+
+    return error;
 }
 
 void sccl_destroy_stream(sccl_stream_t stream)

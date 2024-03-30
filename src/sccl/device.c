@@ -30,7 +30,7 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
         return sccl_unsupported_error;
     }
 
-    VkQueueFamilyProperties2 *queue_family_properties;
+    VkQueueFamilyProperties2 *queue_family_properties = NULL;
     CHECK_SCCL_ERROR_RET(sccl_calloc((void **)&queue_family_properties,
                                      queue_family_count,
                                      sizeof(VkQueueFamilyProperties2)));
@@ -67,18 +67,24 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
 sccl_error_t sccl_create_device(const sccl_instance_t instance,
                                 sccl_device_t *device, uint32_t device_index)
 {
-    struct sccl_device *device_internal;
-    CHECK_SCCL_ERROR_RET(
-        sccl_calloc((void **)&device_internal, 1, sizeof(struct sccl_device)));
+    sccl_error_t error = sccl_success;
+
+    struct sccl_device *device_internal = NULL;
+    CHECK_SCCL_ERROR_GOTO(
+        sccl_calloc((void **)&device_internal, 1, sizeof(struct sccl_device)),
+        error_return, error);
 
     /* find device at index */
     VkPhysicalDevice physical_device;
-    CHECK_SCCL_ERROR_RET(
-        get_physical_device_at_index(instance, &physical_device, device_index));
+    CHECK_SCCL_ERROR_GOTO(
+        get_physical_device_at_index(instance, &physical_device, device_index),
+        error_return, error);
     device_internal->physical_device = physical_device;
 
-    CHECK_SCCL_ERROR_RET(find_queue_family_index(
-        physical_device, &device_internal->queue_family_index));
+    CHECK_SCCL_ERROR_GOTO(
+        find_queue_family_index(physical_device,
+                                &device_internal->queue_family_index),
+        error_return, error);
 
     float queue_priority = 1.0;
 
@@ -98,13 +104,24 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
     device_create_info.pQueueCreateInfos = &queue_create_info;
     device_create_info.pEnabledFeatures = &physical_device_features;
 
-    CHECK_VKRESULT_RET(vkCreateDevice(physical_device, &device_create_info,
-                                      NULL, &device_internal->device));
+    CHECK_VKRESULT_GOTO(vkCreateDevice(physical_device, &device_create_info,
+                                       NULL, &device_internal->device),
+                        error_return, error);
 
     /* set public handle */
     *device = (sccl_device_t)device_internal;
 
     return sccl_success;
+
+error_return:
+    if (device_internal != NULL) {
+        if (device_internal->device != VK_NULL_HANDLE) {
+            vkDestroyDevice(device_internal->device, NULL);
+        }
+        sccl_free(device_internal);
+    }
+
+    return error;
 }
 
 void sccl_destroy_device(sccl_device_t device)
