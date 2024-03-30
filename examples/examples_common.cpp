@@ -4,6 +4,17 @@
 #include <binary_util.hpp>
 #include <iostream>
 
+void print_data_buffer(const sccl_buffer_t buffer, size_t size)
+{
+    void *data;
+    UNWRAP_SCCL_ERROR(sccl_host_map_buffer(buffer, &data, 0, size));
+
+    print_buffer_binary_xxd((const char *)data, size);
+
+    sccl_host_unmap_buffer(buffer);
+}
+
+/*
 void print_data_buffers(const ComputeDevice *compute_device,
                         size_t num_elements, VkDeviceMemory input_buffer_memory,
                         VkDeviceMemory output_buffer_memory)
@@ -29,6 +40,7 @@ void print_data_buffers(const ComputeDevice *compute_device,
     vkUnmapMemory(compute_device->m_device, input_buffer_memory);
     vkUnmapMemory(compute_device->m_device, output_buffer_memory);
 }
+*/
 
 std::optional<std::string> read_file(const char *filepath)
 {

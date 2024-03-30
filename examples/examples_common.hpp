@@ -4,6 +4,7 @@
 
 #include <binary_util.hpp>
 #include <compute_interface.h>
+#include <sccl.h>
 #include <vulkan/vk_enum_string_helper.h>
 
 #include <optional>
@@ -17,9 +18,14 @@
         }                                                                      \
     } while (0)
 
-void print_data_buffers(const ComputeDevice *compute_device,
-                        size_t num_elements, VkDeviceMemory input_buffer_memory,
-                        VkDeviceMemory output_buffer_memory);
+#define UNWRAP_SCCL_ERROR(error)                                               \
+    do {                                                                       \
+        if (error != sccl_success) {                                           \
+            exit(EXIT_FAILURE);                                                \
+        }                                                                      \
+    } while (0)
+
+void print_data_buffer(const sccl_buffer_t buffer, size_t size);
 
 std::optional<std::string> read_file(const char *filepath);
 
