@@ -88,8 +88,9 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     case sccl_buffer_type_shared_storage:
     case sccl_buffer_type_shared_uniform:
         memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT |
-                                VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        /* `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` makes shared buffer turbo slow
+         * to read back to CPU */
         break;
     default:
         return sccl_invalid_argument;

@@ -156,7 +156,10 @@ void sccl_get_device_properties(const sccl_device_t device,
             physical_device_properties.properties.limits
                 .maxComputeWorkGroupSize[i];
     }
-    device_properties->native_workgroup_size =
+    device_properties->max_work_group_invocations =
+        physical_device_properties.properties.limits
+            .maxComputeWorkGroupInvocations;
+    device_properties->native_work_group_size =
         physical_device_subgroup_properties.subgroupSize;
     device_properties->max_storage_buffer_size =
         physical_device_properties.properties.limits.maxStorageBufferRange;

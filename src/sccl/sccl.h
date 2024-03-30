@@ -117,7 +117,11 @@ typedef struct {
                 https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
               */
     uint32_t
-        native_workgroup_size; /* `subgroupSize` from
+        max_work_group_invocations; /* `maxComputeWorkGroupInvocations` from
+                                       https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+                                     */
+    uint32_t
+        native_work_group_size; /* `subgroupSize` from
                                   https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupProperties.html
                                 */
     uint32_t

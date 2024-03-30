@@ -2,12 +2,13 @@
 #include "examples_common.hpp"
 
 #include <chrono>
+#include <cstring>
 #include <inttypes.h>
 #include <iostream>
 #include <string>
 #include <vector>
 
-#include <compute_interface.h>
+#include <sccl.h>
 
 const char *COMPUTE_SHADER_PATH = "shaders/compute_reduce_shader.spv";
 
@@ -21,101 +22,70 @@ int main(int argc, char **argv)
     (void)argc;
     (void)argv;
 
-    ComputeDevice compute_device = {};
-    UNWRAP_VKRESULT(create_compute_device(true, &compute_device));
+    /* init gpu */
+    sccl_instance_t instance;
+    UNWRAP_SCCL_ERROR(sccl_create_instance(&instance));
+    sccl_device_t device;
+    UNWRAP_SCCL_ERROR(
+        sccl_create_device(instance, &device, 0)); /* select gpu at index 0 */
 
-    // query device properties
-    VkPhysicalDeviceSubgroupProperties physical_device_subgroup_properties = {};
-    physical_device_subgroup_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-    VkPhysicalDeviceProperties2 physical_device_properties = {};
-    physical_device_properties.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-    physical_device_properties.pNext = &physical_device_subgroup_properties;
-    vkGetPhysicalDeviceProperties2(compute_device.m_physical_device,
-                                   &physical_device_properties);
-    VkPhysicalDeviceFeatures2 physical_device_features = {};
-    physical_device_features.sType =
-        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-    vkGetPhysicalDeviceFeatures2(compute_device.m_physical_device,
-                                 &physical_device_features);
-
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupSize[0] = "
+    /* get device properties */
+    sccl_device_properties_t device_properties = {};
+    sccl_get_device_properties(device, &device_properties);
+    for (size_t i = 0; i < 3; ++i) {
+        printf("device_properties.max_work_group_count[%lu] = "
+               "%" PRIu32 "\n",
+               i, device_properties.max_work_group_count[i]);
+    }
+    for (size_t i = 0; i < 3; ++i) {
+        printf("device_properties.max_work_group_size[%lu] = "
+               "%" PRIu32 "\n",
+               i, device_properties.max_work_group_size[i]);
+    }
+    printf("device_properties.max_work_group_invocations = "
            "%" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupSize[0]);
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupSize[1] = "
-           "%" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupSize[1]);
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupSize[2] = "
-           "%" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupSize[2]);
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupCount[0] = %" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupCount[0]);
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupCount[1] = %" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupCount[1]);
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupCount[2] = %" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupCount[2]);
-    printf("physical_device_properties.properties.limits."
-           "maxComputeWorkGroupInvocations = "
-           "%" PRIu32 "\n",
-           physical_device_properties.properties.limits
-               .maxComputeWorkGroupInvocations);
-    printf("physical_device_subgroup_properties.subgroupSize = %" PRIu32 "\n",
-           physical_device_subgroup_properties.subgroupSize);
-    printf("physical_device_properties.properties.limits.maxStorageBufferRange "
+           device_properties.max_work_group_invocations);
+    printf("device_properties.native_work_group_size = %" PRIu32 "\n",
+           device_properties.native_work_group_size);
+    printf("device_properties.max_storage_buffer_size "
            "= %" PRIu32 "\n",
-           physical_device_properties.properties.limits.maxStorageBufferRange);
-    printf("physical_device_features.features.shaderInt64 = %d\n",
-           physical_device_features.features.shaderInt64);
+           device_properties.max_storage_buffer_size);
+    printf("device_properties.max_uniform_buffer_size "
+           "= %" PRIu32 "\n",
+           device_properties.max_uniform_buffer_size);
 
-    // set rank sizes
-    uint32_t shader_workgroup_size[3];
-    shader_workgroup_size[0] = physical_device_subgroup_properties.subgroupSize;
-    shader_workgroup_size[1] = 1;
-    shader_workgroup_size[2] = 1;
+    /* set rank sizes */
+    uint32_t shader_work_group_size[3];
+    shader_work_group_size[0] = device_properties.native_work_group_size;
+    shader_work_group_size[1] = 1;
+    shader_work_group_size[2] = 1;
 
-    // distribute
-    // physical_device_properties.properties.limits.maxStorageBufferRange
-    // accross dimentions
+    /* distribute `device_properties.max_storage_buffer_size` across dimensions
+     */
     unsigned int number_of_ranks = 1000;
-    size_t allocated_size =
-        physical_device_properties.properties.limits.maxStorageBufferRange /
-        sizeof(int) / number_of_ranks / shader_workgroup_size[0];
+    size_t allocated_size = device_properties.max_storage_buffer_size /
+                            sizeof(int) / number_of_ranks /
+                            shader_work_group_size[0];
 
-    uint32_t shader_workgroup_count[3];
-    fill_until(allocated_size, shader_workgroup_count[0],
-               physical_device_properties.properties.limits
-                   .maxComputeWorkGroupCount[0]);
-    allocated_size /= shader_workgroup_count[0];
-    fill_until(allocated_size, shader_workgroup_count[1],
-               physical_device_properties.properties.limits
-                   .maxComputeWorkGroupCount[1]);
-    allocated_size /= shader_workgroup_count[1];
-    fill_until(allocated_size, shader_workgroup_count[2],
-               physical_device_properties.properties.limits
-                   .maxComputeWorkGroupCount[2]);
+    uint32_t shader_work_group_count[3];
+    fill_until(allocated_size, shader_work_group_count[0],
+               device_properties.max_work_group_count[0]);
+    allocated_size /= shader_work_group_count[0];
+    fill_until(allocated_size, shader_work_group_count[1],
+               device_properties.max_work_group_count[1]);
+    allocated_size /= shader_work_group_count[1];
+    fill_until(allocated_size, shader_work_group_count[2],
+               device_properties.max_work_group_count[2]);
 
     for (size_t i = 0; i < 3; ++i) {
-        printf("shader_workgroup_count[%lu] = %" PRIu32 "\n", i,
-               shader_workgroup_count[i]);
+        printf("shader_work_group_count[%lu] = %" PRIu32 "\n", i,
+               shader_work_group_count[i]);
     }
 
     unsigned int rank_size =
-        shader_workgroup_count[0] * shader_workgroup_count[1] *
-        shader_workgroup_count[2] * shader_workgroup_size[0] *
-        shader_workgroup_size[1] * shader_workgroup_size[2];
+        shader_work_group_count[0] * shader_work_group_count[1] *
+        shader_work_group_count[2] * shader_work_group_size[0] *
+        shader_work_group_size[1] * shader_work_group_size[2];
     size_t rank_size_bytes = rank_size * sizeof(int);
     printf("number_of_ranks = %d\n", number_of_ranks);
     printf("rank_size = %u\n", rank_size);
@@ -125,7 +95,7 @@ int main(int argc, char **argv)
     ubo.numberOfRanks = number_of_ranks;
     ubo.rankSize = rank_size;
 
-    // read shader
+    /* read shader */
     auto shader_source = read_file(COMPUTE_SHADER_PATH);
     if (!shader_source.has_value()) {
         fprintf(stderr, "Failed to open shader file: %s\n",
@@ -133,89 +103,109 @@ int main(int argc, char **argv)
         exit(EXIT_FAILURE);
     }
 
-    // create input buffer
-    ComputeBuffer input_buffer;
-    UNWRAP_VKRESULT(create_compute_buffer(
-        &compute_device, rank_size_bytes * number_of_ranks, &input_buffer,
-        VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
-    std::vector<int> input_data(rank_size * number_of_ranks);
+    /* create input buffer */
+    const size_t input_buffer_size_bytes = rank_size_bytes * number_of_ranks;
+    sccl_buffer_t input_buffer;
+    sccl_shader_buffer_layout_t input_buffer_layout;
+    sccl_shader_buffer_binding_t input_buffer_binding;
+    int *input_data;
+    UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &input_buffer,
+                                         sccl_buffer_type_shared_storage,
+                                         input_buffer_size_bytes));
+    sccl_set_buffer_layout_binding(input_buffer, 0, 0, &input_buffer_layout,
+                                   &input_buffer_binding);
+    UNWRAP_SCCL_ERROR(sccl_host_map_buffer(input_buffer, (void **)&input_data,
+                                           0, input_buffer_size_bytes));
 
-    // fill input buffer
+    /* create output buffer */
+    const size_t output_buffer_size_bytes = rank_size_bytes;
+    sccl_buffer_t output_buffer;
+    sccl_shader_buffer_layout_t output_buffer_layout;
+    sccl_shader_buffer_binding_t output_buffer_binding;
+    int *output_data;
+    UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &output_buffer,
+                                         sccl_buffer_type_shared_storage,
+                                         output_buffer_size_bytes));
+    sccl_set_buffer_layout_binding(output_buffer, 1, 0, &output_buffer_layout,
+                                   &output_buffer_binding);
+
+    /* create ubo */
+    const size_t uniform_buffer_size_bytes = sizeof(UniformBufferObject);
+    sccl_buffer_t uniform_buffer;
+    sccl_shader_buffer_layout_t uniform_buffer_layout;
+    sccl_shader_buffer_binding_t uniform_buffer_binding;
+    void *uniform_data;
+    UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &uniform_buffer,
+                                         sccl_buffer_type_shared_uniform,
+                                         uniform_buffer_size_bytes));
+    sccl_set_buffer_layout_binding(uniform_buffer, 2, 0, &uniform_buffer_layout,
+                                   &uniform_buffer_binding);
+    UNWRAP_SCCL_ERROR(sccl_host_map_buffer(uniform_buffer, &uniform_data, 0,
+                                           uniform_buffer_size_bytes));
+
+    /* fill input buffer */
     for (size_t i = 0; i < rank_size * number_of_ranks; ++i) {
         input_data[i] = static_cast<int>(i);
     }
-    UNWRAP_VKRESULT(write_to_compute_buffer(
-        &compute_device, &input_buffer, 0, sizeof(int) * input_data.size(),
-        static_cast<const void *>(input_data.data())));
 
-    // create output buffer
-    ComputeBuffer output_buffer;
-    UNWRAP_VKRESULT(create_compute_buffer(&compute_device, rank_size_bytes,
-                                          &output_buffer,
-                                          VK_BUFFER_USAGE_STORAGE_BUFFER_BIT));
+    /* fill uniform */
+    std::memcpy(uniform_data, &ubo, sizeof(UniformBufferObject));
 
-    // create uniform buffer
-    ComputeBuffer uniform_buffer_object;
-    UNWRAP_VKRESULT(create_compute_buffer(
-        &compute_device, sizeof(UniformBufferObject), &uniform_buffer_object,
-        VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT));
+    /* prepare specialization constants */
+    const size_t specialization_constants_count = 3;
+    sccl_shader_specialization_constant_t
+        specialization_constants[specialization_constants_count];
+    for (size_t i = 0; i < specialization_constants_count; ++i) {
+        specialization_constants[i].constant_id = static_cast<uint32_t>(i);
+        specialization_constants[i].size = sizeof(uint32_t);
+        specialization_constants[i].data = &shader_work_group_size[i];
+    }
 
-    // fill uniform buffer
-    UNWRAP_VKRESULT(write_to_compute_buffer(
-        &compute_device, &uniform_buffer_object, 0, sizeof(UniformBufferObject),
-        static_cast<const void *>(&ubo)));
+    /* create shader */
+    sccl_shader_buffer_layout_t buffer_layouts[] = {
+        input_buffer_layout, output_buffer_layout, uniform_buffer_layout};
+    sccl_shader_config_t shader_config = {};
+    shader_config.shader_source_code = shader_source.value().data();
+    shader_config.shader_source_code_length = shader_source.value().size();
+    shader_config.buffer_layouts = buffer_layouts;
+    shader_config.buffer_layouts_count = 3;
+    shader_config.specialization_constants = specialization_constants;
+    shader_config.specialization_constants_count =
+        specialization_constants_count;
+    sccl_shader_t shader;
+    UNWRAP_SCCL_ERROR(sccl_create_shader(device, &shader, &shader_config));
 
-    // set up SpecializationInfo, this is used to set constants in shader, for
-    VkSpecializationMapEntry specialization_map_entry[3] = {};
-    specialization_map_entry[0].constantID = 0;
-    specialization_map_entry[0].offset = sizeof(uint32_t) * 0;
-    specialization_map_entry[0].size = sizeof(uint32_t);
-    specialization_map_entry[1].constantID = 1;
-    specialization_map_entry[1].offset = sizeof(uint32_t) * 1;
-    specialization_map_entry[1].size = sizeof(uint32_t);
-    specialization_map_entry[2].constantID = 2;
-    specialization_map_entry[2].offset = sizeof(uint32_t) * 2;
-    specialization_map_entry[2].size = sizeof(uint32_t);
-    VkSpecializationInfo specialization_info = {};
-    specialization_info.mapEntryCount = 3;
-    specialization_info.pMapEntries = specialization_map_entry;
-    specialization_info.dataSize = sizeof(shader_workgroup_size);
-    specialization_info.pData = &shader_workgroup_size;
+    /* create stream */
+    sccl_stream_t stream;
+    UNWRAP_SCCL_ERROR(sccl_create_stream(device, &stream));
 
-    // create compute pipeline
-    ComputePipeline compute_pipeline;
-    UNWRAP_VKRESULT(
-        create_compute_pipeline(&compute_device, shader_source.value().data(),
-                                shader_source.value().size(), 1, 1, 1,
-                                &specialization_info, &compute_pipeline));
+    /* run shader */
+    sccl_shader_buffer_binding_t buffer_bindings[] = {
+        input_buffer_binding, output_buffer_binding, uniform_buffer_binding};
+    sccl_shader_run_params_t params = {};
+    params.group_count_x = shader_work_group_count[0];
+    params.group_count_y = shader_work_group_count[1];
+    params.group_count_z = shader_work_group_count[2];
+    params.buffer_bindings = buffer_bindings;
+    params.buffer_bindings_count = 3;
 
-    // create descriptor set
-    ComputeDescriptorSets compute_descriptor_sets;
-    UNWRAP_VKRESULT(create_compute_descriptor_sets(
-        &compute_device, &compute_pipeline, &compute_descriptor_sets));
-
-    // update descriptor set
-    UNWRAP_VKRESULT(update_compute_descriptor_sets(
-        &compute_device, &compute_pipeline, &input_buffer, &output_buffer,
-        &uniform_buffer_object, &compute_descriptor_sets));
-
-    // run compute
     std::chrono::system_clock::time_point time_point;
     std::chrono::system_clock::duration duration;
     time_point = std::chrono::high_resolution_clock::now();
-    UNWRAP_VKRESULT(run_compute_pipeline_sync(
-        &compute_device, &compute_pipeline, &compute_descriptor_sets,
-        shader_workgroup_count[0], shader_workgroup_count[1],
-        shader_workgroup_count[2]));
+
+    UNWRAP_SCCL_ERROR(sccl_run_shader(stream, shader, &params));
+    UNWRAP_SCCL_ERROR(sccl_dispatch_stream(stream));
+
+    /* wait for stream to complete */
+    UNWRAP_SCCL_ERROR(sccl_join_stream(stream));
+
     duration = std::chrono::high_resolution_clock::now() - time_point;
     printf("Shader time: %" PRIi64 " ns\n", duration.count());
 
-    // verify output data
-    std::vector<int> output_data(rank_size);
-    UNWRAP_VKRESULT(read_from_compute_buffer(&compute_device, &output_buffer, 0,
-                                             output_buffer.m_size,
-                                             output_data.data()));
+    UNWRAP_SCCL_ERROR(sccl_host_map_buffer(output_buffer, (void **)&output_data,
+                                           0, output_buffer_size_bytes));
 
+    // verify output data
     time_point = std::chrono::high_resolution_clock::now();
     for (size_t i = 0; i < rank_size; ++i) {
         // compute expected data
@@ -234,12 +224,17 @@ int main(int argc, char **argv)
     printf("Verify time: %" PRIi64 " ns\n", duration.count());
     printf("Success, all values expected!\n");
 
-    // cleanup
-    destroy_compute_buffer(&compute_device, &input_buffer);
-    destroy_compute_buffer(&compute_device, &output_buffer);
-    destroy_compute_buffer(&compute_device, &uniform_buffer_object);
-    destroy_compute_pipeline(&compute_device, &compute_pipeline);
-    destroy_compute_device(&compute_device);
+    /* cleanup */
+    sccl_destroy_stream(stream);
+    sccl_destroy_shader(shader);
+    sccl_host_unmap_buffer(uniform_buffer);
+    sccl_host_unmap_buffer(output_buffer);
+    sccl_host_unmap_buffer(input_buffer);
+    sccl_destroy_buffer(uniform_buffer);
+    sccl_destroy_buffer(output_buffer);
+    sccl_destroy_buffer(input_buffer);
+    sccl_destroy_device(device);
+    sccl_destroy_instance(instance);
 
     return EXIT_SUCCESS;
 }
