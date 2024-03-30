@@ -42,13 +42,8 @@ init_output_buffer(const sccl_device_t device, size_t size,
               sccl_success);
     memset((void *)data, 0, size);
     sccl_host_unmap_buffer(*output_buffer);
-    sccl_shader_buffer_position_t output_buffer_position = {};
-    output_buffer_position.set = 0;
-    output_buffer_position.binding = 0;
-    output_buffer_layout->position = output_buffer_position;
-    output_buffer_layout->type = sccl_buffer_type_shared;
-    output_buffer_binding->position = output_buffer_position;
-    output_buffer_binding->buffer = *output_buffer;
+    sccl_set_buffer_layout_binding(*output_buffer, 0, 0, output_buffer_layout,
+                                   output_buffer_binding);
 }
 
 TEST_F(shader_test, shader_noop)
@@ -235,7 +230,7 @@ TEST_F(shader_test, shader_push_constants)
     /* setup output buffer to verify results */
     sccl_buffer_t output_buffer;
     uint32_t *output_data;
-    const size_t output_buffer_size = sizeof(PushConstant); // in bytes
+    const size_t output_buffer_size = sizeof(PushConstant); /* in bytes */
     sccl_shader_buffer_layout_t output_buffer_layout = {};
     sccl_shader_buffer_binding_t output_buffer_binding = {};
     init_output_buffer(device, output_buffer_size, &output_buffer,
@@ -321,24 +316,16 @@ TEST_F(shader_test, shader_copy_buffer)
     EXPECT_EQ(sccl_create_buffer(device, &device_output_buffer,
                                  sccl_buffer_type_device, buffer_size),
               sccl_success);
-    sccl_shader_buffer_position_t device_input_buffer_position = {};
-    device_input_buffer_position.set = 0;
-    device_input_buffer_position.binding = 0;
     sccl_shader_buffer_layout_t device_input_buffer_layout = {};
-    device_input_buffer_layout.position = device_input_buffer_position;
-    device_input_buffer_layout.type = sccl_buffer_type_device;
     sccl_shader_buffer_binding_t device_input_buffer_binding = {};
-    device_input_buffer_binding.position = device_input_buffer_position;
-    device_input_buffer_binding.buffer = device_input_buffer;
-    sccl_shader_buffer_position_t device_output_buffer_position = {};
-    device_output_buffer_position.set = 0;
-    device_output_buffer_position.binding = 1;
+    sccl_set_buffer_layout_binding(device_input_buffer, 0, 0,
+                                   &device_input_buffer_layout,
+                                   &device_input_buffer_binding);
     sccl_shader_buffer_layout_t device_output_buffer_layout = {};
-    device_output_buffer_layout.position = device_output_buffer_position;
-    device_output_buffer_layout.type = sccl_buffer_type_device;
     sccl_shader_buffer_binding_t device_output_buffer_binding = {};
-    device_output_buffer_binding.position = device_output_buffer_position;
-    device_output_buffer_binding.buffer = device_output_buffer;
+    sccl_set_buffer_layout_binding(device_output_buffer, 0, 1,
+                                   &device_output_buffer_layout,
+                                   &device_output_buffer_binding);
 
     void *input_data;
     void *output_data;

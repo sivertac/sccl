@@ -167,6 +167,15 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                              const sccl_shader_t shader,
                              const sccl_shader_run_params_t *params);
 
+/**
+ * Set `buffer_layout` and `buffer_binding` according to contents of `buffer`,
+ * `set` and `binding`.
+ */
+void sccl_set_buffer_layout_binding(
+    const sccl_buffer_t buffer, uint32_t set, uint32_t binding,
+    sccl_shader_buffer_layout_t *buffer_layout,
+    sccl_shader_buffer_binding_t *buffer_binding);
+
 #ifdef __cplusplus
 }
 #endif

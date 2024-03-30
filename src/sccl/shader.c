@@ -690,3 +690,19 @@ error_return:
 
     return error;
 }
+
+void sccl_set_buffer_layout_binding(
+    const sccl_buffer_t buffer, uint32_t set, uint32_t binding,
+    sccl_shader_buffer_layout_t *buffer_layout,
+    sccl_shader_buffer_binding_t *buffer_binding)
+{
+    memset(buffer_layout, 0, sizeof(sccl_shader_buffer_layout_t));
+    memset(buffer_binding, 0, sizeof(sccl_shader_buffer_binding_t));
+    sccl_shader_buffer_position_t buffer_position = {};
+    buffer_position.set = set;
+    buffer_position.binding = binding;
+    buffer_layout->position = buffer_position;
+    buffer_layout->type = buffer->type;
+    buffer_binding->position = buffer_position;
+    buffer_binding->buffer = buffer;
+}
