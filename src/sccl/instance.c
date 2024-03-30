@@ -123,7 +123,7 @@ static sccl_error_t check_validation_layer_support(bool *supported)
 static sccl_error_t update_physical_device_list(sccl_instance_t instance)
 {
 
-    if (instance->physical_devices != SCCL_NULL) {
+    if (instance->physical_devices != NULL) {
         sccl_free(instance->physical_devices);
     }
 
@@ -223,7 +223,7 @@ error_return:
 
 void sccl_destroy_instance(sccl_instance_t instance)
 {
-    if (instance->physical_devices != SCCL_NULL) {
+    if (instance->physical_devices != NULL) {
         sccl_free(instance->physical_devices);
     }
 

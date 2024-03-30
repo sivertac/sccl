@@ -51,10 +51,10 @@
         }                                                                      \
     } while (0)
 
-/* Check if pointer is SCCL_NULL, return invalid argument if SCCL_NULL */
+/* Check if pointer is NULL, return invalid argument if NULL */
 #define CHECK_SCCL_NULL_RET(pointer)                                           \
     do {                                                                       \
-        if (pointer == SCCL_NULL) {                                            \
+        if (pointer == NULL) {                                                 \
             return sccl_invalid_argument;                                      \
         }                                                                      \
     } while (0)

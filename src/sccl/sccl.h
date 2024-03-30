@@ -45,7 +45,6 @@ typedef struct sccl_device *sccl_device_t;     /* opaque handle */
 typedef struct sccl_buffer *sccl_buffer_t;     /* opaque handle */
 typedef struct sccl_stream *sccl_stream_t;     /* opaque handle */
 typedef struct sccl_shader *sccl_shader_t;     /* opaque handle */
-#define SCCL_NULL NULL
 
 typedef struct {
     uint32_t constant_id;

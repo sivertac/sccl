@@ -10,7 +10,7 @@ get_physical_device_at_index(const sccl_instance_t instance,
                              VkPhysicalDevice *physical_device,
                              uint32_t device_index)
 {
-    assert(instance->physical_devices != SCCL_NULL);
+    assert(instance->physical_devices != NULL);
     if (device_index >= instance->physical_device_count) {
         return sccl_invalid_argument;
     }
