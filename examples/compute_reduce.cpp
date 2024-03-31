@@ -1,15 +1,17 @@
 
 #include "examples_common.hpp"
 
+#include <algorithm>
 #include <chrono>
 #include <cstring>
+#include <functional>
 #include <getopt.h>
 #include <inttypes.h>
 #include <iostream>
+#include <numeric>
+#include <sccl.h>
 #include <string>
 #include <vector>
-
-#include <sccl.h>
 
 const char *COMPUTE_SHADER_PATH = "shaders/compute_reduce_shader.spv";
 
@@ -25,18 +27,22 @@ int main(int argc, char **argv)
     unsigned int number_of_ranks = 4;
     int input_rank_size = -1;
     bool copy_buffer = false;
+    int iterations = 1;
+    bool verify = true;
     while (true) {
         static struct option long_options[] = {
             {"help", no_argument, 0, 'h'},
             {"gpu", required_argument, 0, 'g'},
             {"ranks", required_argument, 0, 'r'},
             {"ranksize", required_argument, 0, 's'},
-            {"copybuffer", no_argument, 0, 'c'},
+            {"copybuffer", required_argument, 0, 'c'},
+            {"iterations", required_argument, 0, 'i'},
+            {"verify", required_argument, 0, 'v'},
             {0, 0, 0, 0}};
         /* getopt_long stores the option index here */
         int option_index = 0;
-        int c =
-            getopt_long(argc, argv, "hg:r:s:c", long_options, &option_index);
+        int c = getopt_long(argc, argv, "hg:r:s:ci:v:", long_options,
+                            &option_index);
         /* Detect the end of the options */
         if (c == -1) {
             break;
@@ -56,7 +62,13 @@ int main(int argc, char **argv)
             input_rank_size = atoi(optarg);
             break;
         case 'c':
-            copy_buffer = true;
+            copy_buffer = static_cast<bool>(atoi(optarg));
+            break;
+        case 'i':
+            iterations = atoi(optarg);
+            break;
+        case 'v':
+            verify = atoi(optarg);
             break;
         case '?':
             /* getopt_long already printed an error message */
@@ -65,6 +77,10 @@ int main(int argc, char **argv)
             abort();
         }
     }
+
+    printf("copy_buffer = %d\n", copy_buffer);
+    printf("iterations = %d\n", iterations);
+    printf("verify = %d\n", verify);
 
     /* init gpu */
     sccl_instance_t instance;
@@ -218,11 +234,6 @@ int main(int argc, char **argv)
     UNWRAP_SCCL_ERROR(sccl_host_map_buffer(uniform_buffer, &uniform_data, 0,
                                            uniform_buffer_size_bytes));
 
-    /* fill input buffer */
-    for (size_t i = 0; i < rank_size * number_of_ranks; ++i) {
-        input_data[i] = static_cast<int>(i);
-    }
-
     /* fill uniform */
     std::memcpy(uniform_data, &ubo, sizeof(UniformBufferObject));
 
@@ -254,60 +265,105 @@ int main(int argc, char **argv)
     sccl_stream_t stream;
     UNWRAP_SCCL_ERROR(sccl_create_stream(device, &stream));
 
-    /* run stream */
-    std::chrono::system_clock::time_point time_point;
-    std::chrono::system_clock::duration duration;
-    time_point = std::chrono::high_resolution_clock::now();
-
-    sccl_shader_buffer_binding_t buffer_bindings[] = {
-        input_buffer_binding, output_buffer_binding, uniform_buffer_binding};
-    sccl_shader_run_params_t params = {};
-    params.group_count_x = shader_work_group_count[0];
-    params.group_count_y = shader_work_group_count[1];
-    params.group_count_z = shader_work_group_count[2];
-    params.buffer_bindings = buffer_bindings;
-    params.buffer_bindings_count = 3;
-
-    if (copy_buffer) {
-        UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, input_staging_buffer, 0,
-                                           input_buffer, 0,
-                                           input_buffer_size_bytes));
-    }
-
-    UNWRAP_SCCL_ERROR(sccl_run_shader(stream, shader, &params));
-
-    if (copy_buffer) {
-        UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, output_buffer, 0,
-                                           output_staging_buffer, 0,
-                                           output_buffer_size_bytes));
-    }
-
-    UNWRAP_SCCL_ERROR(sccl_dispatch_stream(stream));
-
-    /* wait for stream to complete */
-    UNWRAP_SCCL_ERROR(sccl_join_stream(stream));
-
-    duration = std::chrono::high_resolution_clock::now() - time_point;
-    printf("Shader time: %" PRIi64 " ns\n", duration.count());
-
-    // verify output data
-    time_point = std::chrono::high_resolution_clock::now();
-    for (size_t i = 0; i < rank_size; ++i) {
-        // compute expected data
-        int expected_value = 0;
-        for (size_t rank = 0; rank < number_of_ranks; ++rank) {
-            expected_value += input_data[rank * rank_size + i];
+    std::chrono::high_resolution_clock::time_point total_start_time =
+        std::chrono::high_resolution_clock::now();
+    std::vector<std::chrono::high_resolution_clock::duration> iteration_times;
+    iteration_times.reserve(iterations);
+    std::vector<std::chrono::high_resolution_clock::duration> shader_times;
+    shader_times.reserve(iterations);
+    for (int iter = 0; iter < iterations; ++iter) {
+        std::chrono::high_resolution_clock::time_point iteration_start_time =
+            std::chrono::high_resolution_clock::now();
+        /* run stream */
+        /* fill input buffer */
+        for (size_t i = 0; i < rank_size * number_of_ranks; ++i) {
+            input_data[i] = static_cast<int>(i);
         }
-        if (output_data[i] != expected_value) {
-            printf("Unexpected value at i = %lu: output_data[i] = %d, "
-                   "expected_value = %d\n",
-                   i, output_data[i], expected_value);
-            return EXIT_FAILURE;
+
+        /* clear output buffer */
+        std::memset(output_data, 0, output_buffer_size_bytes);
+
+        std::chrono::high_resolution_clock::time_point time_point;
+        std::chrono::high_resolution_clock::duration duration;
+        time_point = std::chrono::high_resolution_clock::now();
+
+        sccl_shader_buffer_binding_t buffer_bindings[] = {
+            input_buffer_binding, output_buffer_binding,
+            uniform_buffer_binding};
+        sccl_shader_run_params_t params = {};
+        params.group_count_x = shader_work_group_count[0];
+        params.group_count_y = shader_work_group_count[1];
+        params.group_count_z = shader_work_group_count[2];
+        params.buffer_bindings = buffer_bindings;
+        params.buffer_bindings_count = 3;
+
+        if (copy_buffer) {
+            UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, input_staging_buffer, 0,
+                                               input_buffer, 0,
+                                               input_buffer_size_bytes));
         }
+
+        UNWRAP_SCCL_ERROR(sccl_run_shader(stream, shader, &params));
+
+        if (copy_buffer) {
+            UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, output_buffer, 0,
+                                               output_staging_buffer, 0,
+                                               output_buffer_size_bytes));
+        }
+
+        UNWRAP_SCCL_ERROR(sccl_dispatch_stream(stream));
+
+        /* wait for stream to complete */
+        UNWRAP_SCCL_ERROR(sccl_join_stream(stream));
+
+        duration = std::chrono::high_resolution_clock::now() - time_point;
+        shader_times.push_back(duration);
+
+        // verify output data
+        if (verify) {
+            for (size_t i = 0; i < rank_size; ++i) {
+                // compute expected data
+                int expected_value = 0;
+                for (size_t rank = 0; rank < number_of_ranks; ++rank) {
+                    expected_value += input_data[rank * rank_size + i];
+                }
+                if (output_data[i] != expected_value) {
+                    printf("Unexpected value at i = %lu: output_data[i] = %d, "
+                           "expected_value = %d\n",
+                           i, output_data[i], expected_value);
+                    return EXIT_FAILURE;
+                }
+            }
+        }
+
+        duration =
+            std::chrono::high_resolution_clock::now() - iteration_start_time;
+        iteration_times.push_back(duration);
     }
-    duration = std::chrono::high_resolution_clock::now() - time_point;
-    printf("Verify time: %" PRIi64 " ns\n", duration.count());
-    printf("Success, all values expected!\n");
+
+    std::chrono::high_resolution_clock::time_point total_end_time =
+        std::chrono::high_resolution_clock::now();
+    std::chrono::high_resolution_clock::duration total_duration =
+        total_end_time - total_start_time;
+    double total_run_time = static_cast<double>(total_duration.count());
+    double mean_iteration_time =
+        std::accumulate(std::begin(iteration_times), std::end(iteration_times),
+                        double{0.0},
+                        [](double sum, auto e) {
+                            return static_cast<double>(sum + e.count());
+                        }) /
+        static_cast<double>(iterations);
+    double mean_shader_time =
+        std::accumulate(std::begin(shader_times), std::end(shader_times),
+                        double{0.0},
+                        [](double sum, auto e) {
+                            return static_cast<double>(sum + e.count());
+                        }) /
+        static_cast<double>(iterations);
+    printf("Total run time (ns), Mean iteration time (ns), Mean shader time "
+           "(ns)\n");
+    printf("%f, %f, %f\n", total_run_time, mean_iteration_time,
+           mean_shader_time);
 
     /* cleanup */
     sccl_destroy_stream(stream);
