@@ -3,6 +3,7 @@
 
 #include <chrono>
 #include <cstring>
+#include <getopt.h>
 #include <inttypes.h>
 #include <iostream>
 #include <string>
@@ -19,15 +20,57 @@ struct UniformBufferObject {
 
 int main(int argc, char **argv)
 {
-    (void)argc;
-    (void)argv;
+    /* cmd input */
+    int gpu_index = 0;
+    unsigned int number_of_ranks = 4;
+    int input_rank_size = -1;
+    bool copy_buffer = false;
+    while (true) {
+        static struct option long_options[] = {
+            {"help", no_argument, 0, 'h'},
+            {"gpu", required_argument, 0, 'g'},
+            {"ranks", required_argument, 0, 'r'},
+            {"ranksize", required_argument, 0, 's'},
+            {"copybuffer", no_argument, 0, 'c'},
+            {0, 0, 0, 0}};
+        /* getopt_long stores the option index here */
+        int option_index = 0;
+        int c =
+            getopt_long(argc, argv, "hg:r:s:c", long_options, &option_index);
+        /* Detect the end of the options */
+        if (c == -1) {
+            break;
+        }
+        switch (c) {
+        case 'h':
+            printf("usage: %s [-h] [-g <gpu index>]\n", argv[0]);
+            return EXIT_SUCCESS;
+            break;
+        case 'g':
+            gpu_index = atoi(optarg);
+            break;
+        case 'r':
+            number_of_ranks = atoi(optarg);
+            break;
+        case 's':
+            input_rank_size = atoi(optarg);
+            break;
+        case 'c':
+            copy_buffer = true;
+            break;
+        case '?':
+            /* getopt_long already printed an error message */
+            break;
+        default:
+            abort();
+        }
+    }
 
     /* init gpu */
     sccl_instance_t instance;
     UNWRAP_SCCL_ERROR(sccl_create_instance(&instance));
     sccl_device_t device;
-    UNWRAP_SCCL_ERROR(
-        sccl_create_device(instance, &device, 0)); /* select gpu at index 0 */
+    UNWRAP_SCCL_ERROR(sccl_create_device(instance, &device, gpu_index));
 
     /* get device properties */
     sccl_device_properties_t device_properties = {};
@@ -62,10 +105,10 @@ int main(int argc, char **argv)
 
     /* distribute `device_properties.max_storage_buffer_size` across dimensions
      */
-    unsigned int number_of_ranks = 1000;
-    size_t allocated_size = device_properties.max_storage_buffer_size /
-                            sizeof(int) / number_of_ranks /
-                            shader_work_group_size[0];
+    size_t allocated_size =
+        ((input_rank_size == -1) ? device_properties.max_storage_buffer_size
+                                 : input_rank_size) /
+        sizeof(int) / number_of_ranks / shader_work_group_size[0];
 
     uint32_t shader_work_group_count[3];
     fill_until(allocated_size, shader_work_group_count[0],
@@ -108,26 +151,58 @@ int main(int argc, char **argv)
     sccl_buffer_t input_buffer;
     sccl_shader_buffer_layout_t input_buffer_layout;
     sccl_shader_buffer_binding_t input_buffer_binding;
+    sccl_buffer_t input_staging_buffer;
     int *input_data;
-    UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &input_buffer,
-                                         sccl_buffer_type_shared_storage,
-                                         input_buffer_size_bytes));
-    sccl_set_buffer_layout_binding(input_buffer, 0, 0, &input_buffer_layout,
-                                   &input_buffer_binding);
-    UNWRAP_SCCL_ERROR(sccl_host_map_buffer(input_buffer, (void **)&input_data,
-                                           0, input_buffer_size_bytes));
+    if (!copy_buffer) {
+        UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &input_buffer,
+                                             sccl_buffer_type_shared_storage,
+                                             input_buffer_size_bytes));
+        sccl_set_buffer_layout_binding(input_buffer, 0, 0, &input_buffer_layout,
+                                       &input_buffer_binding);
+        UNWRAP_SCCL_ERROR(sccl_host_map_buffer(
+            input_buffer, (void **)&input_data, 0, input_buffer_size_bytes));
+    } else {
+        UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &input_buffer,
+                                             sccl_buffer_type_device_storage,
+                                             input_buffer_size_bytes));
+        sccl_set_buffer_layout_binding(input_buffer, 0, 0, &input_buffer_layout,
+                                       &input_buffer_binding);
+        UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &input_staging_buffer,
+                                             sccl_buffer_type_host_storage,
+                                             input_buffer_size_bytes));
+        UNWRAP_SCCL_ERROR(sccl_host_map_buffer(input_staging_buffer,
+                                               (void **)&input_data, 0,
+                                               input_buffer_size_bytes));
+    }
 
     /* create output buffer */
     const size_t output_buffer_size_bytes = rank_size_bytes;
     sccl_buffer_t output_buffer;
     sccl_shader_buffer_layout_t output_buffer_layout;
     sccl_shader_buffer_binding_t output_buffer_binding;
+    sccl_buffer_t output_staging_buffer;
     int *output_data;
-    UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &output_buffer,
-                                         sccl_buffer_type_shared_storage,
-                                         output_buffer_size_bytes));
-    sccl_set_buffer_layout_binding(output_buffer, 1, 0, &output_buffer_layout,
-                                   &output_buffer_binding);
+    if (!copy_buffer) {
+        UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &output_buffer,
+                                             sccl_buffer_type_shared_storage,
+                                             output_buffer_size_bytes));
+        sccl_set_buffer_layout_binding(
+            output_buffer, 1, 0, &output_buffer_layout, &output_buffer_binding);
+        UNWRAP_SCCL_ERROR(sccl_host_map_buffer(
+            output_buffer, (void **)&output_data, 0, output_buffer_size_bytes));
+    } else {
+        UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &output_buffer,
+                                             sccl_buffer_type_device_storage,
+                                             output_buffer_size_bytes));
+        sccl_set_buffer_layout_binding(
+            output_buffer, 1, 0, &output_buffer_layout, &output_buffer_binding);
+        UNWRAP_SCCL_ERROR(sccl_create_buffer(device, &output_staging_buffer,
+                                             sccl_buffer_type_host_storage,
+                                             output_buffer_size_bytes));
+        UNWRAP_SCCL_ERROR(sccl_host_map_buffer(output_staging_buffer,
+                                               (void **)&output_data, 0,
+                                               output_buffer_size_bytes));
+    }
 
     /* create ubo */
     const size_t uniform_buffer_size_bytes = sizeof(UniformBufferObject);
@@ -179,7 +254,11 @@ int main(int argc, char **argv)
     sccl_stream_t stream;
     UNWRAP_SCCL_ERROR(sccl_create_stream(device, &stream));
 
-    /* run shader */
+    /* run stream */
+    std::chrono::system_clock::time_point time_point;
+    std::chrono::system_clock::duration duration;
+    time_point = std::chrono::high_resolution_clock::now();
+
     sccl_shader_buffer_binding_t buffer_bindings[] = {
         input_buffer_binding, output_buffer_binding, uniform_buffer_binding};
     sccl_shader_run_params_t params = {};
@@ -189,11 +268,20 @@ int main(int argc, char **argv)
     params.buffer_bindings = buffer_bindings;
     params.buffer_bindings_count = 3;
 
-    std::chrono::system_clock::time_point time_point;
-    std::chrono::system_clock::duration duration;
-    time_point = std::chrono::high_resolution_clock::now();
+    if (copy_buffer) {
+        UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, input_staging_buffer, 0,
+                                           input_buffer, 0,
+                                           input_buffer_size_bytes));
+    }
 
     UNWRAP_SCCL_ERROR(sccl_run_shader(stream, shader, &params));
+
+    if (copy_buffer) {
+        UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, output_buffer, 0,
+                                           output_staging_buffer, 0,
+                                           output_buffer_size_bytes));
+    }
+
     UNWRAP_SCCL_ERROR(sccl_dispatch_stream(stream));
 
     /* wait for stream to complete */
@@ -201,9 +289,6 @@ int main(int argc, char **argv)
 
     duration = std::chrono::high_resolution_clock::now() - time_point;
     printf("Shader time: %" PRIi64 " ns\n", duration.count());
-
-    UNWRAP_SCCL_ERROR(sccl_host_map_buffer(output_buffer, (void **)&output_data,
-                                           0, output_buffer_size_bytes));
 
     // verify output data
     time_point = std::chrono::high_resolution_clock::now();
@@ -228,8 +313,15 @@ int main(int argc, char **argv)
     sccl_destroy_stream(stream);
     sccl_destroy_shader(shader);
     sccl_host_unmap_buffer(uniform_buffer);
-    sccl_host_unmap_buffer(output_buffer);
-    sccl_host_unmap_buffer(input_buffer);
+    if (!copy_buffer) {
+        sccl_host_unmap_buffer(output_buffer);
+        sccl_host_unmap_buffer(input_buffer);
+    } else {
+        sccl_host_unmap_buffer(output_staging_buffer);
+        sccl_host_unmap_buffer(input_staging_buffer);
+        sccl_destroy_buffer(output_staging_buffer);
+        sccl_destroy_buffer(input_staging_buffer);
+    }
     sccl_destroy_buffer(uniform_buffer);
     sccl_destroy_buffer(output_buffer);
     sccl_destroy_buffer(input_buffer);
