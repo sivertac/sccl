@@ -513,8 +513,6 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
     /* verify output data */
     for (size_t i = 0; i < stream_count; ++i) {
         for (uint32_t j = 0; j < buffer_element_count; ++j) {
-            *(((uint32_t *)input_datas[i]) + j) = i;
-
             EXPECT_EQ(*(((uint32_t *)output_datas[i]) + j), j / 2);
         }
     }
