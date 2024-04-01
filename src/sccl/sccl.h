@@ -78,6 +78,8 @@ typedef struct {
     sccl_buffer_t buffer;
 } sccl_shader_buffer_binding_t;
 
+#define SCCL_DEFAULT_MAX_CONCURRENT_BUFFER_BINDINGS 8
+
 typedef struct {
     char *shader_source_code;         /* required */
     size_t shader_source_code_length; /* must be larger than 0 */
@@ -88,6 +90,9 @@ typedef struct {
     size_t push_constant_layouts_count;
     sccl_shader_buffer_layout_t *buffer_layouts; /* optional */
     size_t buffer_layouts_count;
+    /* maximum number of concurrent buffer bindings for this shader, if 0 then
+     * `SCCL_DEFAULT_MAX_CONCURRENT_BUFFER_BINDINGS` is used */
+    size_t max_concurrent_buffer_bindings;
 } sccl_shader_config_t;
 
 typedef struct {
@@ -295,6 +300,9 @@ void sccl_destroy_shader(sccl_shader_t shader);
 
 /**
  * Add shader run command to stream.
+ * If error `sccl_out_of_resources_error` is returned, it is possible to
+ * increase the limit at shader creation by setting
+ * `max_concurrent_buffer_bindings` in `sccl_shader_config_t`.
  * @param stream Stream.
  * @param shader Shader.
  * @param params Params describing how to execute the shader, see

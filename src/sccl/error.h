@@ -6,6 +6,9 @@
 #include <assert.h>
 #include <vulkan/vulkan.h>
 
+#include <stdio.h>
+#include <vulkan/vk_enum_string_helper.h>
+
 #define UNWRAP_VKRESULT(result)                                                \
     do {                                                                       \
         if (result != VK_SUCCESS) {                                            \
@@ -28,6 +31,7 @@
 #define CHECK_VKRESULT_GOTO(result, goto_label, store_sccl_error)              \
     do {                                                                       \
         if (result != VK_SUCCESS) {                                            \
+            fprintf(stderr, "Vulkan error: %s\n", string_VkResult(result));    \
             store_sccl_error = sccl_unhandled_vulkan_error;                    \
             goto goto_label;                                                   \
         }                                                                      \

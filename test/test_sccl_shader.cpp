@@ -291,9 +291,9 @@ TEST_F(shader_test, shader_push_constants)
 
 TEST_F(shader_test, shader_copy_buffer)
 {
-    const size_t run_count =
-        2; /* number of times to rerun pipeline to test if stream can be used
-              again after running a pipeline */
+    /* number of times to rerun pipeline to test if stream can be used again
+     * after running a pipeline */
+    const size_t run_count = 2;
     const size_t buffer_element_count = 0x1000;
     const size_t buffer_size = buffer_element_count * sizeof(uint32_t);
     std::string shader_source =
@@ -396,4 +396,140 @@ TEST_F(shader_test, shader_copy_buffer)
     sccl_destroy_buffer(host_output_buffer);
     sccl_destroy_buffer(device_input_buffer);
     sccl_destroy_buffer(device_output_buffer);
+}
+
+TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
+{
+    const size_t stream_count = 10; /* number of concurrent streams */
+    const size_t buffer_element_count = 0x1000;
+    const size_t buffer_size = buffer_element_count * sizeof(uint32_t);
+    std::string shader_source =
+        read_test_shader("copy_buffer_shader.spv").value();
+
+    /* init buffers */
+    std::vector<sccl_buffer_t> host_input_buffers(stream_count);
+    std::vector<sccl_buffer_t> host_output_buffers(stream_count);
+    std::vector<sccl_buffer_t> device_input_buffers(stream_count);
+    std::vector<sccl_buffer_t> device_output_buffers(stream_count);
+    std::vector<sccl_shader_buffer_layout_t> device_input_buffer_layouts(
+        stream_count);
+    std::vector<sccl_shader_buffer_binding_t> device_input_buffer_bindings(
+        stream_count);
+    std::vector<sccl_shader_buffer_layout_t> device_output_buffer_layouts(
+        stream_count);
+    std::vector<sccl_shader_buffer_binding_t> device_output_buffer_bindings(
+        stream_count);
+    std::vector<void *> input_datas(stream_count);
+    std::vector<void *> output_datas(stream_count);
+    for (size_t i = 0; i < stream_count; ++i) {
+        EXPECT_EQ(sccl_create_buffer(device, &host_input_buffers[i],
+                                     sccl_buffer_type_host, buffer_size),
+                  sccl_success);
+        EXPECT_EQ(sccl_create_buffer(device, &host_output_buffers[i],
+                                     sccl_buffer_type_host, buffer_size),
+                  sccl_success);
+        EXPECT_EQ(sccl_create_buffer(device, &device_input_buffers[i],
+                                     sccl_buffer_type_device, buffer_size),
+                  sccl_success);
+        EXPECT_EQ(sccl_create_buffer(device, &device_output_buffers[i],
+                                     sccl_buffer_type_device, buffer_size),
+                  sccl_success);
+        sccl_set_buffer_layout_binding(device_input_buffers[i], 0, 0,
+                                       &device_input_buffer_layouts[i],
+                                       &device_input_buffer_bindings[i]);
+        sccl_set_buffer_layout_binding(device_output_buffers[i], 0, 1,
+                                       &device_output_buffer_layouts[i],
+                                       &device_output_buffer_bindings[i]);
+        EXPECT_EQ(sccl_host_map_buffer(host_input_buffers[i], &input_datas[i],
+                                       0, buffer_size),
+                  sccl_success);
+        EXPECT_EQ(sccl_host_map_buffer(host_output_buffers[i], &output_datas[i],
+                                       0, buffer_size),
+                  sccl_success);
+    }
+
+    /* create shader */
+    /* in this case the buffer layouts are the same for each buffer, so we only
+     * need to create 1 shader for all stream, just pick first layout */
+    sccl_shader_buffer_layout_t buffer_layouts[] = {
+        device_input_buffer_layouts.front(),
+        device_output_buffer_layouts.front()};
+    sccl_shader_config_t shader_config = {};
+    shader_config.shader_source_code = shader_source.data();
+    shader_config.shader_source_code_length = shader_source.size();
+    shader_config.buffer_layouts = buffer_layouts;
+    shader_config.buffer_layouts_count = 2;
+    /* make sure to set `max_concurrent_buffer_bindings` to make sure we can fit
+     * dispatch enought concurrent shaders */
+    shader_config.max_concurrent_buffer_bindings = stream_count;
+    sccl_shader_t shader;
+    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
+              sccl_success);
+
+    /* init buffers */
+    for (size_t i = 0; i < stream_count; ++i) {
+        /* zero out host output buffer */
+        memset(output_datas[i], 0, buffer_size);
+        /* set input data */
+        void *input_data = input_datas[i];
+        for (uint32_t j = 0; j < buffer_element_count; ++j) {
+            *(((uint32_t *)input_data) + j) = j;
+        }
+    }
+
+    /* create streams */
+    std::vector<sccl_stream_t> streams(stream_count);
+    for (size_t i = 0; i < stream_count; ++i) {
+        EXPECT_EQ(sccl_create_stream(device, &streams[i]), sccl_success);
+    }
+
+    /* run */
+    for (size_t i = 0; i < stream_count; ++i) {
+        EXPECT_EQ(sccl_copy_buffer(streams[i], host_input_buffers[i], 0,
+                                   device_input_buffers[i], 0, buffer_size),
+                  sccl_success);
+
+        sccl_shader_buffer_binding_t buffer_bindings[] = {
+            device_input_buffer_bindings[i], device_output_buffer_bindings[i]};
+        sccl_shader_run_params_t params = {};
+        params.group_count_x = buffer_element_count;
+        params.group_count_y = 1;
+        params.group_count_z = 1;
+        params.buffer_bindings = buffer_bindings;
+        params.buffer_bindings_count = 2;
+        ASSERT_EQ(sccl_run_shader(streams[i], shader, &params), sccl_success);
+
+        EXPECT_EQ(sccl_copy_buffer(streams[i], device_output_buffers[i], 0,
+                                   host_output_buffers[i], 0, buffer_size),
+                  sccl_success);
+
+        EXPECT_EQ(sccl_dispatch_stream(streams[i]), sccl_success);
+    }
+
+    for (size_t i = 0; i < stream_count; ++i) {
+        EXPECT_EQ(sccl_join_stream(streams[i]), sccl_success);
+    }
+
+    /* verify output data */
+    for (size_t i = 0; i < stream_count; ++i) {
+        for (uint32_t j = 0; j < buffer_element_count; ++j) {
+            *(((uint32_t *)input_datas[i]) + j) = i;
+
+            EXPECT_EQ(*(((uint32_t *)output_datas[i]) + j), j / 2);
+        }
+    }
+
+    /* cleanup */
+    for (size_t i = 0; i < stream_count; ++i) {
+        sccl_destroy_stream(streams[i]);
+    }
+    sccl_destroy_shader(shader);
+    for (size_t i = 0; i < stream_count; ++i) {
+        sccl_host_unmap_buffer(host_input_buffers[i]);
+        sccl_host_unmap_buffer(host_output_buffers[i]);
+        sccl_destroy_buffer(host_input_buffers[i]);
+        sccl_destroy_buffer(host_output_buffers[i]);
+        sccl_destroy_buffer(device_input_buffers[i]);
+        sccl_destroy_buffer(device_output_buffers[i]);
+    }
 }

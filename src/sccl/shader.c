@@ -259,7 +259,8 @@ static sccl_error_t create_descriptor_pool(VkDevice device,
     const size_t max_descriptor_pool_sizes_count = 2; /* storage and uniform */
     VkDescriptorType structure_types[] = {VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
                                           VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER};
-    size_t counts[] = {storage_buffer_count, uniform_buffer_count};
+    size_t counts[] = {storage_buffer_count * max_descriptor_sets,
+                       uniform_buffer_count * max_descriptor_sets};
 
     VkDescriptorPoolSize descriptor_pool_sizes[max_descriptor_pool_sizes_count];
     memset(descriptor_pool_sizes, 0,
@@ -358,11 +359,18 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     size_t uniform_buffer_count = 0;
     count_buffer_types(config->buffer_layouts, config->buffer_layouts_count,
                        &storage_buffer_count, &uniform_buffer_count);
+    size_t max_descriptor_sets;
+    if (config->max_concurrent_buffer_bindings == 0) {
+        max_descriptor_sets = shader_internal->descriptor_set_layouts_count *
+                              SCCL_DEFAULT_MAX_CONCURRENT_BUFFER_BINDINGS;
+    } else {
+        max_descriptor_sets = config->max_concurrent_buffer_bindings *
+                              shader_internal->descriptor_set_layouts_count;
+    }
     if (storage_buffer_count > 0 || uniform_buffer_count > 0) {
         CHECK_SCCL_ERROR_GOTO(create_descriptor_pool(
                                   shader_internal->device, storage_buffer_count,
-                                  uniform_buffer_count,
-                                  shader_internal->descriptor_set_layouts_count,
+                                  uniform_buffer_count, max_descriptor_sets,
                                   &shader_internal->descriptor_pool),
                               error_return, error);
     }
@@ -582,10 +590,15 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
         alloc_info.descriptorPool = shader->descriptor_pool;
         alloc_info.descriptorSetCount = 1;
         alloc_info.pSetLayouts = &shader->descriptor_set_layouts[i];
-        CHECK_VKRESULT_GOTO(vkAllocateDescriptorSets(stream->device->device,
-                                                     &alloc_info,
-                                                     &descriptor_sets[i]),
-                            error_return, error);
+        VkResult vk_res = vkAllocateDescriptorSets(
+            stream->device->device, &alloc_info, &descriptor_sets[i]);
+        /* in case out of pool error, signal out of resources rather than
+         * default vulkan error */
+        if (vk_res == VK_ERROR_OUT_OF_POOL_MEMORY) {
+            error = sccl_out_of_resources_error;
+            goto error_return;
+        }
+        CHECK_VKRESULT_GOTO(vk_res, error_return, error);
     }
     /* add to stream after all sets are allocated, so we don't have to clean up
      * in case one allocation fails */
