@@ -24,7 +24,7 @@ int main(int argc, char **argv)
 {
     /* cmd input */
     int gpu_index = 0;
-    unsigned int number_of_ranks = 4;
+    int number_of_ranks = 4;
     int input_rank_size = -1;
     bool copy_buffer = false;
     int iterations = 1;
@@ -41,7 +41,7 @@ int main(int argc, char **argv)
             {0, 0, 0, 0}};
         /* getopt_long stores the option index here */
         int option_index = 0;
-        int c = getopt_long(argc, argv, "hg:r:s:ci:v:", long_options,
+        int c = getopt_long(argc, argv, "hg:r:s:c:i:v:", long_options,
                             &option_index);
         /* Detect the end of the options */
         if (c == -1) {
@@ -49,7 +49,10 @@ int main(int argc, char **argv)
         }
         switch (c) {
         case 'h':
-            printf("usage: %s [-h] [-g <gpu index>]\n", argv[0]);
+            printf("usage: %s [-h] [--gpu <gpu index>][--ranks <number of "
+                   "ranks>][--ranksize <rank size (in elements)>][--copybuffer "
+                   "<0 or 1>][--iterations <iterations>][--verify <0 or 1>]\n",
+                   argv[0]);
             return EXIT_SUCCESS;
             break;
         case 'g':
@@ -74,13 +77,18 @@ int main(int argc, char **argv)
             /* getopt_long already printed an error message */
             break;
         default:
+            printf("invalid arg?!");
             abort();
         }
     }
 
-    printf("copy_buffer = %d\n", copy_buffer);
+    printf("User args:\n");
+    printf("gpu = %d\n", gpu_index);
+    printf("ranks = %d\n", number_of_ranks);
+    printf("copybuffer = %d\n", copy_buffer);
     printf("iterations = %d\n", iterations);
     printf("verify = %d\n", verify);
+    printf("\n");
 
     /* init gpu */
     sccl_instance_t instance;
@@ -89,6 +97,7 @@ int main(int argc, char **argv)
     UNWRAP_SCCL_ERROR(sccl_create_device(instance, &device, gpu_index));
 
     /* get device properties */
+    printf("Device properties:\n");
     sccl_device_properties_t device_properties = {};
     sccl_get_device_properties(device, &device_properties);
     for (size_t i = 0; i < 3; ++i) {
@@ -112,6 +121,7 @@ int main(int argc, char **argv)
     printf("device_properties.max_uniform_buffer_size "
            "= %" PRIu32 "\n",
            device_properties.max_uniform_buffer_size);
+    printf("\n");
 
     /* set rank sizes */
     uint32_t shader_work_group_size[3];
@@ -121,10 +131,14 @@ int main(int argc, char **argv)
 
     /* distribute `device_properties.max_storage_buffer_size` across dimensions
      */
-    size_t allocated_size =
-        ((input_rank_size == -1) ? device_properties.max_storage_buffer_size
-                                 : input_rank_size) /
-        sizeof(int) / number_of_ranks / shader_work_group_size[0];
+    size_t allocated_size;
+    if (input_rank_size != -1) {
+        allocated_size = device_properties.max_storage_buffer_size /
+                         sizeof(int) / number_of_ranks /
+                         shader_work_group_size[0];
+    } else {
+        allocated_size = input_rank_size * sizeof(int) * number_of_ranks;
+    }
 
     uint32_t shader_work_group_count[3];
     fill_until(allocated_size, shader_work_group_count[0],
@@ -136,6 +150,7 @@ int main(int argc, char **argv)
     fill_until(allocated_size, shader_work_group_count[2],
                device_properties.max_work_group_count[2]);
 
+    printf("Compute shape:\n");
     for (size_t i = 0; i < 3; ++i) {
         printf("shader_work_group_count[%lu] = %" PRIu32 "\n", i,
                shader_work_group_count[i]);
@@ -149,6 +164,7 @@ int main(int argc, char **argv)
     printf("number_of_ranks = %d\n", number_of_ranks);
     printf("rank_size = %u\n", rank_size);
     printf("rank_size_bytes = %lu\n", rank_size_bytes);
+    printf("\n");
 
     UniformBufferObject ubo = {};
     ubo.numberOfRanks = number_of_ranks;
@@ -324,7 +340,8 @@ int main(int argc, char **argv)
             for (size_t i = 0; i < rank_size; ++i) {
                 // compute expected data
                 int expected_value = 0;
-                for (size_t rank = 0; rank < number_of_ranks; ++rank) {
+                for (size_t rank = 0;
+                     rank < static_cast<size_t>(number_of_ranks); ++rank) {
                     expected_value += input_data[rank * rank_size + i];
                 }
                 if (output_data[i] != expected_value) {
