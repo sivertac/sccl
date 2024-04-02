@@ -6,7 +6,7 @@
 #include <vulkan/vulkan.h>
 
 struct sccl_buffer {
-    VkDevice device;
+    sccl_device_t device;
     sccl_buffer_type_t type;
     VkBuffer buffer;
     VkDeviceMemory device_memory;

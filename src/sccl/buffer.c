@@ -3,6 +3,7 @@
 #include "alloc.h"
 #include "device.h"
 #include "error.h"
+#include <stdbool.h>
 
 static sccl_error_t find_memory_type(VkPhysicalDevice physical_device,
                                      uint32_t type_filter,
@@ -24,6 +25,36 @@ static sccl_error_t find_memory_type(VkPhysicalDevice physical_device,
     return sccl_unsupported_error;
 }
 
+static bool is_buffer_type_storage(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_shared_storage:
+        return true;
+    case sccl_buffer_type_host_uniform:
+    case sccl_buffer_type_device_uniform:
+    case sccl_buffer_type_shared_uniform:
+    default:
+        return false;
+    }
+}
+
+static bool is_buffer_type_uniform(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_uniform:
+    case sccl_buffer_type_device_uniform:
+    case sccl_buffer_type_shared_uniform:
+        return true;
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_shared_storage:
+    default:
+        return false;
+    }
+}
+
 sccl_error_t sccl_create_buffer(const sccl_device_t device,
                                 sccl_buffer_t *buffer, sccl_buffer_type_t type,
                                 size_t size)
@@ -36,23 +67,16 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
         error_return, error);
 
     buffer_internal->type = type;
-    buffer_internal->device = device->device;
+    buffer_internal->device = device;
 
     /* determine buffer usage flags */
     VkBufferUsageFlags buffer_usage_flags = 0;
     /* check if buffer is storage or uniform */
-    switch (type) {
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_shared_storage:
+    if (is_buffer_type_storage(type)) {
         buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-        break;
-    case sccl_buffer_type_host_uniform:
-    case sccl_buffer_type_device_uniform:
-    case sccl_buffer_type_shared_uniform:
+    } else if (is_buffer_type_uniform(type)) {
         buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-        break;
-    default:
+    } else {
         return sccl_invalid_argument;
     }
     buffer_usage_flags |=
@@ -64,13 +88,14 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     buffer_info.size = size;
     buffer_info.usage = buffer_usage_flags;
     buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    CHECK_VKRESULT_GOTO(vkCreateBuffer(buffer_internal->device, &buffer_info,
-                                       NULL, &buffer_internal->buffer),
+    CHECK_VKRESULT_GOTO(vkCreateBuffer(buffer_internal->device->device,
+                                       &buffer_info, NULL,
+                                       &buffer_internal->buffer),
                         error_return, error);
 
     /* get memory requirements */
     VkMemoryRequirements mem_requirements = {0};
-    vkGetBufferMemoryRequirements(buffer_internal->device,
+    vkGetBufferMemoryRequirements(buffer_internal->device->device,
                                   buffer_internal->buffer, &mem_requirements);
 
     /* determine memory property flags */
@@ -109,12 +134,13 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
     alloc_info.allocationSize = mem_requirements.size;
     alloc_info.memoryTypeIndex = memory_type_index;
-    CHECK_VKRESULT_GOTO(vkAllocateMemory(device->device, &alloc_info, NULL,
+    CHECK_VKRESULT_GOTO(vkAllocateMemory(buffer_internal->device->device,
+                                         &alloc_info, NULL,
                                          &buffer_internal->device_memory),
                         error_return, error);
 
     /* bind */
-    CHECK_VKRESULT_GOTO(vkBindBufferMemory(buffer_internal->device,
+    CHECK_VKRESULT_GOTO(vkBindBufferMemory(buffer_internal->device->device,
                                            buffer_internal->buffer,
                                            buffer_internal->device_memory, 0),
                         error_return, error);
@@ -140,9 +166,27 @@ error_return:
 
 void sccl_destroy_buffer(sccl_buffer_t buffer)
 {
-    vkFreeMemory(buffer->device, buffer->device_memory, NULL);
-    vkDestroyBuffer(buffer->device, buffer->buffer, NULL);
+    vkFreeMemory(buffer->device->device, buffer->device_memory, NULL);
+    vkDestroyBuffer(buffer->device->device, buffer->buffer, NULL);
     sccl_free(buffer);
+}
+
+sccl_buffer_type_t sccl_get_buffer_type(const sccl_buffer_t buffer)
+{
+    return buffer->type;
+}
+
+size_t sccl_get_buffer_min_offset_alignment(const sccl_buffer_t buffer)
+{
+    sccl_device_properties_t device_properties = {0};
+    sccl_get_device_properties(buffer->device, &device_properties);
+    if (is_buffer_type_storage(buffer->type)) {
+        return device_properties.min_storage_buffer_offset_alignment;
+    } else if (is_buffer_type_uniform(buffer->type)) {
+        return device_properties.min_uniform_buffer_offset_alignment;
+    }
+    assert(false);
+    return 0;
 }
 
 sccl_error_t sccl_host_map_buffer(const sccl_buffer_t buffer, void **data,
@@ -152,13 +196,13 @@ sccl_error_t sccl_host_map_buffer(const sccl_buffer_t buffer, void **data,
         return sccl_invalid_argument;
     }
 
-    CHECK_VKRESULT_RET(vkMapMemory(buffer->device, buffer->device_memory,
-                                   offset, size, 0, data));
+    CHECK_VKRESULT_RET(vkMapMemory(
+        buffer->device->device, buffer->device_memory, offset, size, 0, data));
 
     return sccl_success;
 }
 
 void sccl_host_unmap_buffer(const sccl_buffer_t buffer)
 {
-    vkUnmapMemory(buffer->device, buffer->device_memory);
+    vkUnmapMemory(buffer->device->device, buffer->device_memory);
 }

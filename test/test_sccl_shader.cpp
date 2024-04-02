@@ -77,6 +77,10 @@ TEST_F(shader_test, shader_buffer_layout)
     std::string shader_source =
         read_test_shader("buffer_layout_shader.spv").value();
 
+    /* get device properties */
+    sccl_device_properties_t device_properties;
+    sccl_get_device_properties(device, &device_properties);
+
     sccl_shader_buffer_layout_t buffer_layouts[binding_count];
     buffer_layouts[0].position.set = 0;
     buffer_layouts[0].position.binding = 0;
@@ -111,6 +115,11 @@ TEST_F(shader_test, shader_buffer_layout)
                   sccl_success);
         bindings[i].position = buffer_layouts[i].position;
         bindings[i].buffer = buffers[i];
+        /* make sure offset is at correct alignment */
+        bindings[i].offset =
+            i * sccl_get_buffer_min_offset_alignment(buffers[i]);
+        /* try weird bind sizes */
+        bindings[i].size = i + 1;
     }
 
     /* run */

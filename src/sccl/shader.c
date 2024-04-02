@@ -623,8 +623,17 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
     for (size_t i = 0; i < params->buffer_bindings_count; ++i) {
         descriptor_buffer_infos[i].buffer =
             params->buffer_bindings[i].buffer->buffer;
-        descriptor_buffer_infos[i].offset = 0;
-        descriptor_buffer_infos[i].range = VK_WHOLE_SIZE;
+        descriptor_buffer_infos[i].offset = params->buffer_bindings[i].offset;
+        /* validate bind size */
+        if (params->buffer_bindings[i].size == 0 &&
+            params->buffer_bindings[i].size != SCCL_BIND_WHOLE_BUFFER) {
+            error = sccl_invalid_argument;
+            goto error_return;
+        }
+        descriptor_buffer_infos[i].range =
+            (params->buffer_bindings[i].size == SCCL_BIND_WHOLE_BUFFER)
+                ? VK_WHOLE_SIZE
+                : params->buffer_bindings[i].size;
 
         write_descriptor_sets[i].sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
         write_descriptor_sets[i].dstSet =
@@ -718,4 +727,6 @@ void sccl_set_buffer_layout_binding(
     buffer_layout->type = buffer->type;
     buffer_binding->position = buffer_position;
     buffer_binding->buffer = buffer;
+    buffer_binding->offset = 0;
+    buffer_binding->size = SCCL_BIND_WHOLE_BUFFER;
 }

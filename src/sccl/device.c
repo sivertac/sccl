@@ -167,4 +167,10 @@ void sccl_get_device_properties(const sccl_device_t device,
         physical_device_properties.properties.limits.maxUniformBufferRange;
     device_properties->max_push_constant_size =
         physical_device_properties.properties.limits.maxPushConstantsSize;
+    device_properties->min_storage_buffer_offset_alignment =
+        physical_device_properties.properties.limits
+            .minStorageBufferOffsetAlignment;
+    device_properties->min_uniform_buffer_offset_alignment =
+        physical_device_properties.properties.limits
+            .minUniformBufferOffsetAlignment;
 }

@@ -73,9 +73,18 @@ typedef struct {
     sccl_buffer_type_t type;
 } sccl_shader_buffer_layout_t;
 
+#define SCCL_BIND_WHOLE_BUFFER (~0ul)
+
 typedef struct {
     sccl_shader_buffer_position_t position;
     sccl_buffer_t buffer;
+    /* offset in buffer (in bytes). Offset must be aligned according to buffer
+     * type requirement, this can be queried in device properties. */
+    size_t offset;
+    /* Bytes to include after offset, set to `SCCL_BIND_WHOLE_BUFFER` to bind
+     * whole buffer. Must be larger than 0 or `SCCL_BIND_WHOLE_BUFFER`. If wrong
+     * size `sccl_invalid_argument` is returned.  */
+    size_t size;
 } sccl_shader_buffer_binding_t;
 
 #define SCCL_DEFAULT_MAX_CONCURRENT_BUFFER_BINDINGS 8
@@ -111,36 +120,42 @@ typedef struct {
  * Struct containing various device properties queried from vulkan.
  */
 typedef struct {
-    uint32_t max_work_group_count
-        [3]; /* index: `0 = x, 1 = y, 2 = z`.
-                `maxComputeWorkGroupCount` from
-                https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-              */
-    uint32_t max_work_group_size
-        [3]; /* index: `0 = x, 1 = y, 2 = z`.
-                `maxComputeWorkGroupSize` from
-                https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-              */
-    uint32_t
-        max_work_group_invocations; /* `maxComputeWorkGroupInvocations` from
-                                       https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-                                     */
-    uint32_t
-        native_work_group_size; /* `subgroupSize` from
-                                  https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupProperties.html
-                                */
-    uint32_t
-        max_storage_buffer_size; /* `maxStorageBufferRange` from
-                                    https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-                                  */
-    uint32_t
-        max_uniform_buffer_size; /* `maxUniformBufferRange` from
-                                    https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-                                  */
-    uint32_t
-        max_push_constant_size; /*  `maxPushConstantsSize` from
-                                   https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
-                                 */
+    /* index: `0 = x, 1 = y, 2 = z`. `maxComputeWorkGroupCount` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    uint32_t max_work_group_count[3];
+    /* index: `0 = x, 1 = y, 2 = z`. `maxComputeWorkGroupSize` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    uint32_t max_work_group_size[3];
+    /* `maxComputeWorkGroupInvocations` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    uint32_t max_work_group_invocations;
+    /* `subgroupSize` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceSubgroupProperties.html
+     */
+    uint32_t native_work_group_size;
+    /* `maxStorageBufferRange` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    uint32_t max_storage_buffer_size;
+    /* `maxUniformBufferRange` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    uint32_t max_uniform_buffer_size;
+    /* `maxPushConstantsSize` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    uint32_t max_push_constant_size;
+    /* `minStorageBufferOffsetAlignment` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    size_t min_storage_buffer_offset_alignment;
+    /* `minUniformBufferOffsetAlignment` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
+     */
+    size_t min_uniform_buffer_offset_alignment;
 } sccl_device_properties_t;
 
 /**
@@ -218,6 +233,18 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
  * @param buffer Buffer.
  */
 void sccl_destroy_buffer(sccl_buffer_t buffer);
+
+/**
+ * Get buffer type.
+ * @param buffer Buffer.
+ */
+sccl_buffer_type_t sccl_get_buffer_type(const sccl_buffer_t buffer);
+
+/**
+ * Get buffer type.
+ * @param buffer Buffer.
+ */
+size_t sccl_get_buffer_min_offset_alignment(const sccl_buffer_t buffer);
 
 /**
  * Map buffer memory on host.
