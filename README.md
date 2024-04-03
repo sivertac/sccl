@@ -9,6 +9,7 @@ Sivert Collective Compute Library (SCCL) is a wrapper library for simplifying wr
 * C17 compatible compiler
 * C++20 compatible compiler
 * Vulkan SDK https://vulkan.lunarg.com/
+* clang-tidy-15
 
 ### Run tests
 Run this is build directory:
