@@ -154,19 +154,20 @@ sccl_error_t sccl_dispatch_stream(const sccl_stream_t stream)
 
 sccl_error_t sccl_join_stream(const sccl_stream_t stream)
 {
+    /* wait */
+    CHECK_SCCL_ERROR_RET(sccl_wait_streams(stream->device, &stream, 1, NULL));
 
-    /* block until command buffer is done
-     * 1 fence per stream
-     * 1 minute timeout */
-    VkResult res = VK_SUCCESS;
-    do {
-        res = vkWaitForFences(stream->device->device, 1, &stream->fence, false,
-                              60000000000);
-    } while (res == VK_TIMEOUT);
-    CHECK_VKRESULT_RET(res);
+    /* reset */
+    CHECK_SCCL_ERROR_RET(sccl_reset_stream(stream));
 
+    return sccl_success;
+}
+
+sccl_error_t sccl_reset_stream(const sccl_stream_t stream)
+{
     /* free descriptor sets */
-    free_descriptor_sets(stream->device->device, &stream->descriptor_sets);
+    CHECK_SCCL_ERROR_RET(
+        free_descriptor_sets(stream->device->device, &stream->descriptor_sets));
 
     /* reset fence */
     CHECK_VKRESULT_RET(
@@ -176,6 +177,62 @@ sccl_error_t sccl_join_stream(const sccl_stream_t stream)
     CHECK_SCCL_ERROR_RET(reset_command_buffer(stream));
 
     return sccl_success;
+}
+
+sccl_error_t sccl_wait_streams(const sccl_device_t device,
+                               const sccl_stream_t *streams,
+                               size_t streams_count, uint8_t *completed_streams)
+{
+    sccl_error_t error = sccl_success;
+
+    VkFence *fences = NULL;
+
+    CHECK_SCCL_ERROR_GOTO(
+        sccl_calloc((void **)&fences, streams_count, sizeof(VkFence)),
+        error_return, error);
+    /* copy fences */
+    for (size_t i = 0; i < streams_count; ++i) {
+        fences[i] = streams[i]->fence;
+    }
+
+    /* block until command buffer is done
+     * 1 fence per stream
+     * 1 minute timeout */
+    VkResult res = VK_SUCCESS;
+    do {
+        /* TODO: use VK_KHR_external_fence_fd
+         * (https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VK_KHR_external_fence_fd.html)
+         * instead */
+        res = vkWaitForFences(device->device, streams_count, fences, false,
+                              60000000000);
+    } while (res == VK_TIMEOUT);
+    CHECK_VKRESULT_GOTO(res, error_return, error);
+
+    /* check signaled streams*/
+    for (size_t i = 0; i < streams_count; ++i) {
+        res = vkGetFenceStatus(device->device, fences[i]);
+        if (res == VK_SUCCESS) {
+            if (completed_streams != NULL) {
+                completed_streams[i] = 1;
+            }
+            CHECK_SCCL_ERROR_GOTO(sccl_reset_stream(streams[i]), error_return,
+                                  error);
+        } else if (res == VK_NOT_READY) {
+            if (completed_streams != NULL) {
+                completed_streams[i] = 0;
+            }
+        } else {
+            CHECK_VKRESULT_GOTO(res, error_return, error);
+        }
+    }
+
+    sccl_free(fences);
+    return sccl_success;
+error_return:
+    if (fences != NULL && completed_streams != NULL) {
+        sccl_free(fences);
+    }
+    return error;
 }
 
 sccl_error_t sccl_copy_buffer(const sccl_stream_t stream,

@@ -53,7 +53,7 @@ TEST_F(stream_test, dispatch_and_join)
 TEST_F(stream_test, dispatch_and_join_multiple)
 {
     /* arbitrary number of streams */
-    size_t stream_count = 10;
+    const size_t stream_count = 10;
     std::vector<sccl_stream_t> streams;
 
     for (size_t i = 0; i < stream_count; ++i) {
@@ -68,6 +68,63 @@ TEST_F(stream_test, dispatch_and_join_multiple)
     for (sccl_stream_t stream : streams) {
         EXPECT_EQ(sccl_join_stream(stream), sccl_success);
     }
+
+    for (sccl_stream_t stream : streams) {
+        sccl_destroy_stream(stream);
+    }
+}
+
+TEST_F(stream_test, dispatch_and_wait)
+{
+    /* arbitrary number of streams */
+    const size_t stream_count = 10;
+    std::vector<sccl_stream_t> streams;
+
+    for (size_t i = 0; i < stream_count; ++i) {
+        streams.push_back({});
+        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+    }
+
+    for (sccl_stream_t stream : streams) {
+        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    }
+
+    EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count, NULL),
+              sccl_success);
+
+    for (sccl_stream_t stream : streams) {
+        sccl_destroy_stream(stream);
+    }
+}
+
+TEST_F(stream_test, dispatch_and_wait_completed_list)
+{
+    /* arbitrary number of streams */
+    const size_t stream_count = 10;
+    std::vector<sccl_stream_t> streams;
+    std::vector<uint8_t> completed_list(stream_count);
+
+    for (size_t i = 0; i < stream_count; ++i) {
+        streams.push_back({});
+        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+    }
+
+    for (sccl_stream_t stream : streams) {
+        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    }
+
+    EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count,
+                                completed_list.data()),
+              sccl_success);
+
+    /* check if atleast 1 stream is signaled */
+    bool complete = false;
+    for (size_t i = 0; i < stream_count; ++i) {
+        if (completed_list[i] == 1) {
+            complete = true;
+        }
+    }
+    EXPECT_TRUE(complete);
 
     for (sccl_stream_t stream : streams) {
         sccl_destroy_stream(stream);

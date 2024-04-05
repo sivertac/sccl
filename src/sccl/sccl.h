@@ -289,11 +289,33 @@ void sccl_destroy_stream(sccl_stream_t stream);
 sccl_error_t sccl_dispatch_stream(const sccl_stream_t stream);
 
 /**
- * Join stream. Wait for stream to complete executing on device. This call is
- * blocking.
+ * Join stream, and reset. Wait for stream to complete executing on device. This
+ * call is blocking.
  * @param stream Stream.
  */
 sccl_error_t sccl_join_stream(const sccl_stream_t stream);
+
+/**
+ * Reset stream.
+ * @param stream Stream.
+ */
+sccl_error_t sccl_reset_stream(const sccl_stream_t stream);
+
+/**
+ * Wait for streams to complete. This call is blocking. Will unblock when first
+ * stream is complete. The streams are reset if they have been signaled.
+ * @param device Device owning streams, all streams must be on a single device.
+ * @param streams Array of streams to wait for.
+ * @param streams_count Number of streams.
+ * @param completed_streams Array to signal if stream is complete or now, this
+ * must be of size `streams_count`. When this call returns, non-complete streams
+ * will be set to 0, while complete will be set to 1. Array indexes corresponds
+ * with streams indexes.
+ */
+sccl_error_t sccl_wait_streams(const sccl_device_t device,
+                               const sccl_stream_t *streams,
+                               size_t streams_count,
+                               uint8_t *completed_streams);
 
 /**
  * Add copy buffer command to stream.
