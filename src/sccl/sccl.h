@@ -318,6 +318,17 @@ sccl_error_t sccl_wait_streams(const sccl_device_t device,
                                uint8_t *completed_streams);
 
 /**
+ * Wait for all streams to complete. The streams are reset if they have been
+ * signaled.
+ * @param device Device owning streams, all streams must be on a single device.
+ * @param streams Array of streams to wait for.
+ * @param streams_count Number of streams.
+ */
+sccl_error_t sccl_wait_streams_all(const sccl_device_t device,
+                                   const sccl_stream_t *streams,
+                                   size_t streams_count);
+
+/**
  * Add copy buffer command to stream.
  * @param stream Stream.
  * @param src Source buffer.

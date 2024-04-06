@@ -130,3 +130,26 @@ TEST_F(stream_test, dispatch_and_wait_completed_list)
         sccl_destroy_stream(stream);
     }
 }
+
+TEST_F(stream_test, dispatch_and_wait_all)
+{
+    /* arbitrary number of streams */
+    const size_t stream_count = 10;
+    std::vector<sccl_stream_t> streams;
+
+    for (size_t i = 0; i < stream_count; ++i) {
+        streams.push_back({});
+        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+    }
+
+    for (sccl_stream_t stream : streams) {
+        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    }
+
+    EXPECT_EQ(sccl_wait_streams_all(device, streams.data(), stream_count),
+              sccl_success);
+
+    for (sccl_stream_t stream : streams) {
+        sccl_destroy_stream(stream);
+    }
+}

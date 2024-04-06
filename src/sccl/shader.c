@@ -718,15 +718,19 @@ void sccl_set_buffer_layout_binding(
     sccl_shader_buffer_layout_t *buffer_layout,
     sccl_shader_buffer_binding_t *buffer_binding)
 {
-    memset(buffer_layout, 0, sizeof(sccl_shader_buffer_layout_t));
-    memset(buffer_binding, 0, sizeof(sccl_shader_buffer_binding_t));
     sccl_shader_buffer_position_t buffer_position = {};
     buffer_position.set = set;
     buffer_position.binding = binding;
-    buffer_layout->position = buffer_position;
-    buffer_layout->type = buffer->type;
-    buffer_binding->position = buffer_position;
-    buffer_binding->buffer = buffer;
-    buffer_binding->offset = 0;
-    buffer_binding->size = SCCL_BIND_WHOLE_BUFFER;
+    if (buffer_layout != NULL) {
+        memset(buffer_layout, 0, sizeof(sccl_shader_buffer_layout_t));
+        buffer_layout->position = buffer_position;
+        buffer_layout->type = buffer->type;
+    }
+    if (buffer_binding != NULL) {
+        memset(buffer_binding, 0, sizeof(sccl_shader_buffer_binding_t));
+        buffer_binding->position = buffer_position;
+        buffer_binding->buffer = buffer;
+        buffer_binding->offset = 0;
+        buffer_binding->size = SCCL_BIND_WHOLE_BUFFER;
+    }
 }
