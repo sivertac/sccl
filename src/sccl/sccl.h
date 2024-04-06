@@ -303,7 +303,7 @@ sccl_error_t sccl_reset_stream(const sccl_stream_t stream);
 
 /**
  * Wait for streams to complete. This call is blocking. Will unblock when first
- * stream is complete. The streams are reset if they have been signaled.
+ * stream is complete. The streams are not reset if they have been signaled.
  * @param device Device owning streams, all streams must be on a single device.
  * @param streams Array of streams to wait for.
  * @param streams_count Number of streams.
@@ -318,7 +318,7 @@ sccl_error_t sccl_wait_streams(const sccl_device_t device,
                                uint8_t *completed_streams);
 
 /**
- * Wait for all streams to complete. The streams are reset if they have been
+ * Wait for all streams to complete. The streams are not reset if they have been
  * signaled.
  * @param device Device owning streams, all streams must be on a single device.
  * @param streams Array of streams to wait for.

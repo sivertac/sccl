@@ -74,8 +74,6 @@ static sccl_error_t wait_streams(const sccl_device_t device,
             if (completed_streams != NULL) {
                 completed_streams[i] = 1;
             }
-            CHECK_SCCL_ERROR_GOTO(sccl_reset_stream(streams[i]), error_return,
-                                  error);
         } else if (res == VK_NOT_READY) {
             if (completed_streams != NULL) {
                 completed_streams[i] = 0;
@@ -213,6 +211,9 @@ sccl_error_t sccl_join_stream(const sccl_stream_t stream)
 {
     /* wait */
     CHECK_SCCL_ERROR_RET(sccl_wait_streams(stream->device, &stream, 1, NULL));
+
+    /* reset */
+    CHECK_SCCL_ERROR_RET(sccl_reset_stream(stream));
 
     return sccl_success;
 }

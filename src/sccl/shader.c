@@ -569,6 +569,9 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                              const sccl_shader_run_params_t *params)
 {
     sccl_error_t error = sccl_success;
+    VkDescriptorSet *descriptor_sets = NULL;
+    VkWriteDescriptorSet *write_descriptor_sets = NULL;
+    VkDescriptorBufferInfo *descriptor_buffer_infos = NULL;
 
     /* validate */
     /* check if push constants are in range */
@@ -579,7 +582,6 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
 
     /* allocate descriptor set, store in stream, will be freed when stream is
      * complete */
-    VkDescriptorSet *descriptor_sets = NULL;
     CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&descriptor_sets,
                                       shader->descriptor_set_layouts_count,
                                       sizeof(VkDescriptorSet)),
@@ -610,12 +612,10 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
     }
 
     /* update descriptor sets */
-    VkWriteDescriptorSet *write_descriptor_sets = NULL;
     CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&write_descriptor_sets,
                                       params->buffer_bindings_count,
                                       sizeof(VkWriteDescriptorSet)),
                           error_return, error);
-    VkDescriptorBufferInfo *descriptor_buffer_infos = NULL;
     CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&descriptor_buffer_infos,
                                       params->buffer_bindings_count,
                                       sizeof(VkDescriptorBufferInfo)),

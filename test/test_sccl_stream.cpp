@@ -89,7 +89,13 @@ TEST_F(stream_test, dispatch_and_wait)
         EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
     }
 
+    /* wait for first to trigger for actual test */
     EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count, NULL),
+              sccl_success);
+
+    /* wait for rest so valitaion layer won't complain about unsignaled fences
+     */
+    EXPECT_EQ(sccl_wait_streams_all(device, streams.data(), stream_count),
               sccl_success);
 
     for (sccl_stream_t stream : streams) {
@@ -113,18 +119,26 @@ TEST_F(stream_test, dispatch_and_wait_completed_list)
         EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
     }
 
-    EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count,
-                                completed_list.data()),
-              sccl_success);
-
-    /* check if atleast 1 stream is signaled */
-    bool complete = false;
-    for (size_t i = 0; i < stream_count; ++i) {
-        if (completed_list[i] == 1) {
-            complete = true;
+    /* wait */
+    while (true) {
+        EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count,
+                                    completed_list.data()),
+                  sccl_success);
+        bool not_complete = false;
+        for (size_t i = 0; i < stream_count; ++i) {
+            if (completed_list[i] == 0) {
+                not_complete = true;
+            }
+        }
+        if (!not_complete) {
+            break;
         }
     }
-    EXPECT_TRUE(complete);
+
+    /* check if all streams are complete */
+    for (size_t i = 0; i < stream_count; ++i) {
+        EXPECT_FALSE(completed_list[i] == 0);
+    }
 
     for (sccl_stream_t stream : streams) {
         sccl_destroy_stream(stream);
