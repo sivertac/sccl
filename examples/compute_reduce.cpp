@@ -85,6 +85,7 @@ int main(int argc, char **argv)
     printf("User args:\n");
     printf("gpu = %d\n", gpu_index);
     printf("ranks = %d\n", number_of_ranks);
+    printf("ranksize = %d\n", input_rank_size);
     printf("copybuffer = %d\n", copy_buffer);
     printf("iterations = %d\n", iterations);
     printf("verify = %d\n", verify);
@@ -132,12 +133,12 @@ int main(int argc, char **argv)
     /* distribute `device_properties.max_storage_buffer_size` across dimensions
      */
     size_t allocated_size;
-    if (input_rank_size != -1) {
+    if (input_rank_size == -1) {
         allocated_size = device_properties.max_storage_buffer_size /
                          sizeof(int) / number_of_ranks /
                          shader_work_group_size[0];
     } else {
-        allocated_size = input_rank_size * sizeof(int) * number_of_ranks;
+        allocated_size = input_rank_size / shader_work_group_size[0];
     }
 
     uint32_t shader_work_group_count[3];

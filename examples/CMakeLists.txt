@@ -23,3 +23,14 @@ target_compile_features(compute_reduce PRIVATE cxx_std_20)
 target_compile_options(compute_reduce PRIVATE -Wall -Wextra -Wswitch)
 target_link_libraries(compute_reduce PUBLIC Vulkan::Vulkan)
 add_dependencies(compute_reduce compute_reduce_shader)
+
+add_executable(compute_reduce_batch
+    ${CMAKE_CURRENT_SOURCE_DIR}/compute_reduce_batch.cpp
+    ${CMAKE_CURRENT_SOURCE_DIR}/examples_common.cpp
+)
+target_include_directories(compute_reduce_batch PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(compute_reduce_batch PRIVATE sccl binary_util)
+target_compile_features(compute_reduce_batch PRIVATE cxx_std_20)
+target_compile_options(compute_reduce_batch PRIVATE -Wall -Wextra -Wswitch)
+target_link_libraries(compute_reduce_batch PUBLIC Vulkan::Vulkan)
+add_dependencies(compute_reduce_batch compute_reduce_shader_batch)
