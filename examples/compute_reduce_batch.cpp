@@ -136,7 +136,9 @@ int main(int argc, char **argv)
     shader_work_group_size[1] = 1;
     shader_work_group_size[2] = 1;
 
-    size_t allocated_size = batch_size;
+    size_t allocated_size = batch_size / shader_work_group_size[0] /
+                            shader_work_group_size[1] /
+                            shader_work_group_size[2];
 
     uint32_t shader_work_group_count[3];
     fill_until(allocated_size, shader_work_group_count[0],
@@ -273,6 +275,7 @@ int main(int argc, char **argv)
     shader_config.specialization_constants = specialization_constants;
     shader_config.specialization_constants_count =
         specialization_constants_count;
+    shader_config.max_concurrent_buffer_bindings = batch_count;
     sccl_shader_t shader;
     UNWRAP_SCCL_ERROR(sccl_create_shader(device, &shader, &shader_config));
 
@@ -353,13 +356,10 @@ int main(int argc, char **argv)
         sccl_set_buffer_layout_binding(input_device_buffer, 0, 0, nullptr,
                                        &input_buffer_binding);
 
-        printf("batch_offset_bytes = %lu\n", batch_offset_bytes);
-        printf("batch_index = %lu\n", batch_index);
         input_buffer_binding.offset =
-            batch_index * batch_size_bytes; /* 1 input batch for each rank */
+            batch_index * batch_size_bytes *
+            number_of_ranks; /* 1 input batch for each rank */
         input_buffer_binding.size = batch_size_bytes * number_of_ranks;
-        printf("input_buffer_binding.offset = %lu\n",
-               input_buffer_binding.offset);
 
         sccl_shader_buffer_binding_t output_buffer_binding = {};
         sccl_set_buffer_layout_binding(output_device_buffer, 1, 0, nullptr,
@@ -382,9 +382,8 @@ int main(int argc, char **argv)
             (rank_size - elements_remaining) * sizeof(ReduceDataType);
         for (size_t i = 0; i < static_cast<size_t>(number_of_ranks); ++i) {
             const size_t src_offset = rank_size_bytes * i + rank_offset_bytes;
-            const size_t dst_offset = batch_size_bytes * i + batch_offset_bytes;
-            printf("src_offset = %lu\n", src_offset);
-            printf("dst_offset = %lu\n", dst_offset);
+            const size_t dst_offset =
+                batch_size_bytes * i + input_buffer_binding.offset;
             UNWRAP_SCCL_ERROR(sccl_copy_buffer(stream, input_staging_buffer,
                                                src_offset, input_device_buffer,
                                                dst_offset, batch_size_bytes));
@@ -393,8 +392,6 @@ int main(int argc, char **argv)
 
         const size_t output_src_offset = batch_offset_bytes;
         const size_t output_dst_offset = rank_offset_bytes;
-        printf("output_src_offset = %lu\n", output_src_offset);
-        printf("output_dst_offset = %lu\n", output_dst_offset);
         UNWRAP_SCCL_ERROR(sccl_copy_buffer(
             stream, output_device_buffer, output_src_offset,
             output_staging_buffer, output_dst_offset, batch_size_bytes));
