@@ -141,14 +141,14 @@ int main(int argc, char **argv)
                             shader_work_group_size[2];
 
     uint32_t shader_work_group_count[3];
-    fill_until(allocated_size, shader_work_group_count[0],
-               device_properties.max_work_group_count[0]);
+    assign_limited(allocated_size, shader_work_group_count[0],
+                   device_properties.max_work_group_count[0]);
     allocated_size /= shader_work_group_count[0];
-    fill_until(allocated_size, shader_work_group_count[1],
-               device_properties.max_work_group_count[1]);
+    assign_limited(allocated_size, shader_work_group_count[1],
+                   device_properties.max_work_group_count[1]);
     allocated_size /= shader_work_group_count[1];
-    fill_until(allocated_size, shader_work_group_count[2],
-               device_properties.max_work_group_count[2]);
+    assign_limited(allocated_size, shader_work_group_count[2],
+                   device_properties.max_work_group_count[2]);
 
     size_t rank_size = (input_rank_size != -1)
                            ? input_rank_size
@@ -215,9 +215,7 @@ int main(int argc, char **argv)
                                            output_staging_buffer_size_bytes));
 
     /* fill input buffer */
-    for (size_t i = 0; i < rank_size * number_of_ranks; ++i) {
-        input_data[i] = static_cast<ReduceDataType>(i);
-    }
+    fill_array_random(input_data, rank_size * number_of_ranks);
 
     /* clear output buffer */
     std::memset(output_data, 0, output_staging_buffer_size_bytes);

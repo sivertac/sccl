@@ -1,9 +1,10 @@
 #pragma once
-#ifndef EXMAPLES_COMMON_HEADER
-#define EXMAPLES_COMMON_HEADER
+#ifndef EXAMPLES_COMMON_HEADER
+#define EXAMPLES_COMMON_HEADER
 
 #include <binary_util.hpp>
 #include <optional>
+#include <random>
 #include <sccl.h>
 #include <type_traits>
 #include <vulkan/vk_enum_string_helper.h>
@@ -34,12 +35,73 @@ std::optional<std::string> read_file(const char *filepath);
 //     "All Params need to be convertible");
 // }
 
+/**
+ * @brief Assigns a value to a target object, limiting it to a specified maximum
+ * size.
+ *
+ * This function template populates a target object with a value derived from a
+ * total value, ensuring that the assigned value does not exceed a specified
+ * maximum size. The function enforces type convertibility between the total
+ * value and the target object to ensure compatibility.
+ *
+ * @tparam T The type of the total value.
+ * @tparam U The type of the target object.
+ * @tparam S The type of the maximum size.
+ *
+ * @param total The total value to be assigned.
+ * @param target The target object to be assigned the value.
+ * @param max_size The maximum size to limit the assigned value.
+ *
+ * @note The function employs a static assertion to verify type convertibility
+ * between T and U.
+ *
+ * @return None.
+ *
+ * @warning If the target object type is not convertible from the total value
+ * type, a static assertion will trigger.
+ *
+ * @remark If the total value exceeds the maximum size, the target object will
+ * be assigned the maximum size; otherwise, it will be assigned the total value.
+ *
+ * @see std::is_convertible
+ */
 template <typename T, typename U, typename S>
-constexpr void fill_until(T total, U &target, S max_size)
+constexpr void assign_limited(T total, U &target, S max_size)
 {
     static_assert(std::is_convertible<U, T>::value,
                   "Params need to be convertible");
     target = (total > max_size) ? max_size : total;
 }
 
-#endif // EXMAPLES_COMMON_HEADER
+/**
+ * @brief Fills an array with random values.
+ *
+ * This function template populates an array with random values of type T.
+ *
+ * @tparam T The type of values to generate.
+ *
+ * @param data Pointer to the beginning of the array.
+ * @param size The size of the array.
+ *
+ * @note This function requires the type T to support a uniform random number
+ * distribution.
+ *
+ * @return None.
+ */
+template <typename T> void fill_array_random(T *data, size_t size)
+{
+    // Initialize a random number generator
+    std::random_device rd;
+    std::mt19937 gen(rd());
+
+    // Define the distribution based on the type T
+    std::uniform_int_distribution<T> distribution(
+        std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
+
+    // Fill the array with random values
+    for (size_t i = 0; i < size; ++i) {
+        data[i] = distribution(gen);
+    }
+}
+
+#endif // EXAMPLES_COMMON_HEADER

@@ -142,14 +142,14 @@ int main(int argc, char **argv)
     }
 
     uint32_t shader_work_group_count[3];
-    fill_until(allocated_size, shader_work_group_count[0],
-               device_properties.max_work_group_count[0]);
+    assign_limited(allocated_size, shader_work_group_count[0],
+                   device_properties.max_work_group_count[0]);
     allocated_size /= shader_work_group_count[0];
-    fill_until(allocated_size, shader_work_group_count[1],
-               device_properties.max_work_group_count[1]);
+    assign_limited(allocated_size, shader_work_group_count[1],
+                   device_properties.max_work_group_count[1]);
     allocated_size /= shader_work_group_count[1];
-    fill_until(allocated_size, shader_work_group_count[2],
-               device_properties.max_work_group_count[2]);
+    assign_limited(allocated_size, shader_work_group_count[2],
+                   device_properties.max_work_group_count[2]);
 
     printf("Compute shape:\n");
     for (size_t i = 0; i < 3; ++i) {
@@ -293,9 +293,7 @@ int main(int argc, char **argv)
             std::chrono::high_resolution_clock::now();
         /* run stream */
         /* fill input buffer */
-        for (size_t i = 0; i < rank_size * number_of_ranks; ++i) {
-            input_data[i] = static_cast<int>(i);
-        }
+        fill_array_random(input_data, rank_size * number_of_ranks);
 
         /* clear output buffer */
         std::memset(output_data, 0, output_buffer_size_bytes);
