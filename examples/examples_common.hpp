@@ -3,6 +3,7 @@
 #define EXAMPLES_COMMON_HEADER
 
 #include <binary_util.hpp>
+#include <chrono>
 #include <optional>
 #include <random>
 #include <sccl.h>
@@ -24,6 +25,16 @@
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)
+
+#define START_TIMER(label)                                                     \
+    std::chrono::high_resolution_clock::time_point START_TIMER_##label =       \
+        std::chrono::high_resolution_clock::now();
+
+#define END_TIMER(label)                                                       \
+    printf(#label " time: %f ns\n",                                            \
+           static_cast<double>((std::chrono::high_resolution_clock::now() -    \
+                                START_TIMER_##label)                           \
+                                   .count()));
 
 void print_data_buffer(const sccl_buffer_t buffer, size_t size);
 

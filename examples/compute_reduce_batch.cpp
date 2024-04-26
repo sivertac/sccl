@@ -1,6 +1,7 @@
 
 #include "examples_common.hpp"
 #include <cassert>
+#include <chrono>
 #include <cstring>
 #include <getopt.h>
 #include <inttypes.h>
@@ -301,6 +302,9 @@ int main(int argc, char **argv)
                       std::end(uniform_buffers));
 
     printf("Run shader\n");
+
+    START_TIMER(Shader);
+
     size_t elements_remaining = rank_size;
     while (elements_remaining > 0) {
         /* if we are out of streams, wait for streams to complete */
@@ -405,9 +409,14 @@ int main(int argc, char **argv)
     UNWRAP_SCCL_ERROR(sccl_wait_streams_all(device, pending_streams.data(),
                                             pending_streams.size()));
 
+    END_TIMER(Shader);
+
     // verify output data
     if (verify) {
         printf("Verify\n");
+
+        START_TIMER(Verify);
+
         for (size_t i = 0; i < rank_size; ++i) {
             // compute expected data
             int expected_value = 0;
@@ -422,6 +431,8 @@ int main(int argc, char **argv)
                 return EXIT_FAILURE;
             }
         }
+
+        END_TIMER(Verify);
     }
 
     /* cleanup */
