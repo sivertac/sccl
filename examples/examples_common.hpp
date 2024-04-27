@@ -26,15 +26,45 @@
         }                                                                      \
     } while (0)
 
+/**
+ * @defgroup TimerMacros Timer Macros
+ * @{
+ */
+
+/**
+ * @def START_TIMER(label)
+ * @brief Start a timer with a specified label.
+ *
+ * This macro starts a timer with a given label using the current
+ * high-resolution clock.
+ *
+ * @param label The label for the timer.
+ */
 #define START_TIMER(label)                                                     \
     std::chrono::high_resolution_clock::time_point START_TIMER_##label =       \
         std::chrono::high_resolution_clock::now();
 
-#define END_TIMER(label)                                                       \
-    printf(#label " time: %f ns\n",                                            \
-           static_cast<double>((std::chrono::high_resolution_clock::now() -    \
-                                START_TIMER_##label)                           \
-                                   .count()));
+/**
+ * @def STOP_TIMER(label)
+ * @brief Stop a timer and print the elapsed time.
+ *
+ * This macro stops a timer labeled with the specified label, calculates the
+ * elapsed time, and prints it in nanoseconds to the standard output.
+ *
+ * @param label The label of the timer to stop.
+ */
+#define STOP_TIMER(label)                                                      \
+    do {                                                                       \
+        std::chrono::high_resolution_clock::duration diff =                    \
+            std::chrono::high_resolution_clock::now() - START_TIMER_##label;   \
+        printf(#label " time: %lu ns (%lu ms)\n", diff.count(),                \
+               std::chrono::duration_cast<std::chrono::milliseconds>(diff)     \
+                   .count());                                                  \
+    } while (0)
+
+/**
+ * @}
+ */
 
 void print_data_buffer(const sccl_buffer_t buffer, size_t size);
 

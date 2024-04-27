@@ -409,7 +409,7 @@ int main(int argc, char **argv)
     UNWRAP_SCCL_ERROR(sccl_wait_streams_all(device, pending_streams.data(),
                                             pending_streams.size()));
 
-    END_TIMER(Shader);
+    STOP_TIMER(Shader);
 
     // verify output data
     if (verify) {
@@ -432,7 +432,7 @@ int main(int argc, char **argv)
             }
         }
 
-        END_TIMER(Verify);
+        STOP_TIMER(Verify);
     }
 
     /* cleanup */
