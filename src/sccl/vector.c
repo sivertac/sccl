@@ -46,6 +46,16 @@ void *vector_get_element(const vector_t *vec, size_t index)
     return get_element_internal(vec, index);
 }
 
+void *vector_get_first_element(const vector_t *vec)
+{
+    return vector_get_element(vec, 0);
+}
+
+void *vector_get_last_element(const vector_t *vec)
+{
+    return vector_get_element(vec, vector_get_size(vec) - 1);
+}
+
 void vector_destroy(vector_t *vec)
 {
     assert(vec != NULL);

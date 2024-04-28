@@ -3,8 +3,9 @@
 #include "alloc.h"
 #include "error.h"
 #include "instance.h"
-#include <stdbool.h>
 #include <string.h>
+
+#define QUEUE_COUNT 2
 
 static sccl_error_t
 get_physical_device_at_index(const sccl_instance_t instance,
@@ -22,6 +23,7 @@ get_physical_device_at_index(const sccl_instance_t instance,
 }
 
 static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
+                                            VkQueueFlags queue_flags,
                                             uint32_t *queue_family_index)
 {
     uint32_t queue_family_count;
@@ -43,15 +45,21 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
     vkGetPhysicalDeviceQueueFamilyProperties2(
         physical_device, &queue_family_count, queue_family_properties);
 
+    /* find queue that is closest to queue_flags */
     bool found = false;
+    VkQueueFlags last_queue_flags =
+        VK_QUEUE_FLAG_BITS_MAX_ENUM; /* init all bits set */
     for (size_t i = 0; i < queue_family_count; ++i) {
-        VkQueueFlagBits queue_flags =
+        VkQueueFlags check_queue_flags =
             queue_family_properties[i].queueFamilyProperties.queueFlags;
-        if ((queue_flags & VK_QUEUE_COMPUTE_BIT) &&
-            (queue_flags & VK_QUEUE_TRANSFER_BIT)) {
+        /* if queue flags match, and less bits are set than last selected queue
+         * index */
+        if (((check_queue_flags & queue_flags) == queue_flags) &&
+            __builtin_popcount(check_queue_flags) <
+                __builtin_popcount(last_queue_flags)) {
             found = true;
+            last_queue_flags = check_queue_flags;
             *queue_family_index = i;
-            break;
         }
     }
 
@@ -63,6 +71,12 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
     sccl_free(queue_family_properties);
 
     return sccl_success;
+}
+
+bool has_seperate_transfer_queue(const sccl_device_t device)
+{
+    return device->compute_queue_family_index !=
+           device->transfer_queue_family_index;
 }
 
 sccl_error_t sccl_create_device(const sccl_instance_t instance,
@@ -83,26 +97,50 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
     device_internal->physical_device = physical_device;
 
     CHECK_SCCL_ERROR_GOTO(
-        find_queue_family_index(physical_device,
-                                &device_internal->queue_family_index),
+        find_queue_family_index(physical_device, VK_QUEUE_COMPUTE_BIT,
+                                &device_internal->compute_queue_family_index),
         error_return, error);
 
-    float queue_priority = 1.0;
+    CHECK_SCCL_ERROR_GOTO(
+        find_queue_family_index(physical_device, VK_QUEUE_TRANSFER_BIT,
+                                &device_internal->transfer_queue_family_index),
+        error_return, error);
 
-    VkDeviceQueueCreateInfo queue_create_info = {0};
-    queue_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    queue_create_info.queueFamilyIndex = device_internal->queue_family_index;
-    /* only allocate 1 queue */
-    queue_create_info.queueCount = 1;
-    queue_create_info.pQueuePriorities = &queue_priority;
+    const bool different_queue_family =
+        has_seperate_transfer_queue(device_internal);
 
+    float queue_priority[] = {1.0, 1.0};
+
+    VkDeviceQueueCreateInfo queue_create_infos[QUEUE_COUNT];
+    memset(queue_create_infos, 0, sizeof(queue_create_infos));
+    queue_create_infos[0].sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+    queue_create_infos[0].queueFamilyIndex =
+        device_internal->compute_queue_family_index;
+    queue_create_infos[0].queueCount = 1;
+    queue_create_infos[0].pQueuePriorities = queue_priority;
+    if (different_queue_family) {
+        queue_create_infos[1].sType =
+            VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        queue_create_infos[1].queueFamilyIndex =
+            device_internal->transfer_queue_family_index;
+        queue_create_infos[1].queueCount = 1;
+        queue_create_infos[1].pQueuePriorities = queue_priority;
+    }
+
+    /* enable required features */
     VkPhysicalDeviceFeatures physical_device_features = {0};
     physical_device_features.shaderInt64 = true;
+    VkPhysicalDeviceVulkan12Features physical_device_vulkan_1_2_features = {0};
+    physical_device_vulkan_1_2_features.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
+    physical_device_vulkan_1_2_features.timelineSemaphore = true;
 
     VkDeviceCreateInfo device_create_info = {0};
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
-    device_create_info.queueCreateInfoCount = 1;
-    device_create_info.pQueueCreateInfos = &queue_create_info;
+    device_create_info.pNext = &physical_device_vulkan_1_2_features;
+    device_create_info.queueCreateInfoCount =
+        (different_queue_family) ? QUEUE_COUNT : 1;
+    device_create_info.pQueueCreateInfos = queue_create_infos;
     device_create_info.pEnabledFeatures = &physical_device_features;
 
     CHECK_VKRESULT_GOTO(vkCreateDevice(physical_device, &device_create_info,

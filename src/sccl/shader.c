@@ -573,6 +573,11 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
     VkWriteDescriptorSet *write_descriptor_sets = NULL;
     VkDescriptorBufferInfo *descriptor_buffer_infos = NULL;
 
+    /* determine command buffer to record to */
+    VkCommandBuffer command_buffer;
+    CHECK_SCCL_ERROR_RET(determine_next_command_buffer(
+        stream, command_buffer_type_compute, &command_buffer));
+
     /* validate */
     /* check if push constants are in range */
     if (params->push_constant_bindings_count >
@@ -654,22 +659,22 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
                            0, NULL);
 
     /* bind the compute pipeline */
-    vkCmdBindPipeline(stream->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+    vkCmdBindPipeline(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
                       shader->compute_pipeline);
 
     /* bind descriptor sets */
     if (shader->descriptor_set_layouts_count > 0) {
-        vkCmdBindDescriptorSets(
-            stream->command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
-            shader->pipeline_layout, 0, shader->descriptor_set_layouts_count,
-            descriptor_sets, 0, NULL);
+        vkCmdBindDescriptorSets(command_buffer, VK_PIPELINE_BIND_POINT_COMPUTE,
+                                shader->pipeline_layout, 0,
+                                shader->descriptor_set_layouts_count,
+                                descriptor_sets, 0, NULL);
     }
 
     /* push constants */
     if (params->push_constant_bindings_count > 0) {
         size_t offset = 0;
         for (size_t i = 0; i < params->push_constant_bindings_count; ++i) {
-            vkCmdPushConstants(stream->command_buffer, shader->pipeline_layout,
+            vkCmdPushConstants(command_buffer, shader->pipeline_layout,
                                VK_SHADER_STAGE_COMPUTE_BIT, offset,
                                shader->push_constant_layouts[i].size,
                                params->push_constant_bindings[i].data);
@@ -678,16 +683,15 @@ sccl_error_t sccl_run_shader(const sccl_stream_t stream,
     }
 
     /* dispatch the compute shader */
-    vkCmdDispatch(stream->command_buffer, params->group_count_x,
-                  params->group_count_y, params->group_count_z);
+    vkCmdDispatch(command_buffer, params->group_count_x, params->group_count_y,
+                  params->group_count_z);
 
     /* create barrier so next command will wait until this is finished */
     VkMemoryBarrier memory_barrier = {0};
     memory_barrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER;
     memory_barrier.srcAccessMask = VK_ACCESS_MEMORY_WRITE_BIT;
     memory_barrier.dstAccessMask = VK_ACCESS_MEMORY_READ_BIT;
-    vkCmdPipelineBarrier(stream->command_buffer,
-                         VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
+    vkCmdPipelineBarrier(command_buffer, VK_PIPELINE_STAGE_ALL_COMMANDS_BIT,
                          VK_PIPELINE_STAGE_ALL_COMMANDS_BIT, 0, 1,
                          &memory_barrier, 0, NULL, 0, NULL);
 
