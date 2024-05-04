@@ -124,25 +124,46 @@ constexpr void assign_limited(T total, U &target, S max_size)
  * @param data Pointer to the beginning of the array.
  * @param size The size of the array.
  *
- * @note This function requires the type T to support a uniform random number
- * distribution.
- *
  * @return None.
  */
 template <typename T> void fill_array_random(T *data, size_t size)
 {
-    // Initialize a random number generator
+    /* Initialize a random number generator */
     std::random_device rd;
     std::mt19937 gen(rd());
 
-    // Define the distribution based on the type T
-    std::uniform_int_distribution<T> distribution(
-        std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
+    /* Define the distribution based on the type T */
+    if constexpr (std::is_integral_v<T>) {
+        std::uniform_int_distribution<T> distribution(
+            std::numeric_limits<T>::min(), std::numeric_limits<T>::max());
 
-    // Fill the array with random values
-    for (size_t i = 0; i < size; ++i) {
-        data[i] = distribution(gen);
+        /* Fill the array with random values */
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = distribution(gen);
+        }
+    } else if (std::is_floating_point_v<T>) {
+        std::uniform_real_distribution<T> distribution(0.0, 1.0);
+
+        /* Fill the array with random values */
+        for (size_t i = 0; i < size; ++i) {
+            data[i] = distribution(gen);
+        }
     }
+}
+
+template <class Container> void print_container(const Container &container)
+{
+    for (auto it = std::begin(container); it != std::end(container);
+         std::advance(it, 1)) {
+        std::printf("%s, ", std::to_string(*it).c_str());
+    }
+    std::printf("\n");
+}
+
+inline bool float_equal(float a, float b,
+                        float epsilon = std::numeric_limits<float>::epsilon())
+{
+    return fabs(a - b) < epsilon;
 }
 
 #endif // EXAMPLES_COMMON_HEADER

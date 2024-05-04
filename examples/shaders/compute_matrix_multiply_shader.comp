@@ -1,0 +1,36 @@
+#version 460
+#extension GL_GOOGLE_include_directive : require
+
+layout(set = 0, binding = 0) buffer MatrixA {
+    float matrix_a[];
+};
+
+layout(set = 0, binding = 1) buffer MatrixB {
+    float matrix_b[];
+};
+
+layout(set = 0, binding = 2) buffer MatrixC {
+    float matrix_c[];
+};
+
+layout (push_constant) uniform PushConstant {
+    uint height_a;
+    uint width_a;
+    uint width_b;
+};
+
+layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
+
+void main() {
+    uint index = gl_GlobalInvocationID.x;
+
+    uint matrix_c_size = height_a * width_b;
+    
+    if (index < matrix_c_size){
+        matrix_c[index] = 0;
+        for (uint i = 0; i < width_a; i++){
+            uint row = index / width_a;
+            matrix_c[index] += matrix_a[i + width_a * row] * matrix_b[index % width_b + width_b * i];
+        }
+    }
+}
