@@ -22,6 +22,10 @@ https://pre-commit.com/
 ```
 pip install pre-commit
 ```
+or
+```
+apt-get install pre-commit
+```
 
 ## Interesting ideas for SCCL
 
