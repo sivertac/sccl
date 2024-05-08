@@ -17,3 +17,9 @@ compile_shader(
     ${CMAKE_CURRENT_SOURCE_DIR}/compute_reduce_shader_batch.comp
     ${CMAKE_CURRENT_BINARY_DIR}/compute_reduce_shader_batch.spv
 )
+
+compile_shader(
+    compute_matrix_multiply_shader
+    ${CMAKE_CURRENT_SOURCE_DIR}/compute_matrix_multiply_shader.comp
+    ${CMAKE_CURRENT_BINARY_DIR}/compute_matrix_multiply_shader.spv
+)
