@@ -160,10 +160,14 @@ template <class Container> void print_container(const Container &container)
     std::printf("\n");
 }
 
-inline bool float_equal(float a, float b,
-                        float epsilon = std::numeric_limits<float>::epsilon())
+template <typename T>
+bool float_equal(T a, T b,
+                        T epsilon = std::numeric_limits<T>::epsilon())
 {
-    return fabs(a - b) < epsilon;
+    T abs_th = std::numeric_limits<T>::min();
+    T diff = std::abs(a - b);
+    T norm = std::min((std::fabs(a) + std::fabs(b)), std::numeric_limits<T>::max());
+    return diff < std::max(abs_th, epsilon * norm);
 }
 
 #endif // EXAMPLES_COMMON_HEADER

@@ -99,7 +99,7 @@ void matrix_multiply_gpu(sccl_device_t device, const float *matrix_a,
     sccl_device_properties_t device_properties = {};
     sccl_get_device_properties(device, &device_properties);
     const uint32_t work_group_count =
-        height_a * width_b / device_properties.native_work_group_size;
+        height_a * width_b / device_properties.native_work_group_size + 1;
 
     sccl_shader_specialization_constant_t specialization_constant;
     specialization_constant.constant_id = 0;
