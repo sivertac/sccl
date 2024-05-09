@@ -179,8 +179,8 @@ int main(int argc, char **argv)
     (void)argv;
 
     const size_t height_a = 10;
-    size_t width_a = 10;
-    size_t width_b = 10;
+    const size_t width_a = 10;
+    const size_t width_b = 10;
     std::vector<float> matrix_a(height_a * width_a);
     std::vector<float> matrix_b(width_a * width_b);
     std::vector<float> matrix_c(height_a * width_b);
@@ -215,6 +215,7 @@ int main(int argc, char **argv)
                         matrix_verify[i]);
         }
     }
+    std::printf("done\n");
 
     sccl_destroy_device(device);
     sccl_destroy_instance(instance);

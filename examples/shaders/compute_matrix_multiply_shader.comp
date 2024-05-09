@@ -24,13 +24,16 @@ layout(local_size_x_id = 0, local_size_y = 1, local_size_z = 1) in;
 void main() {
     uint index = gl_GlobalInvocationID.x;
 
-    uint matrix_c_size = height_a * width_b;
-    
-    if (index < matrix_c_size){
-        matrix_c[index] = 0;
-        for (uint i = 0; i < width_a; i++){
-            uint row = index / width_a;
-            matrix_c[index] += matrix_a[i + width_a * row] * matrix_b[index % width_b + width_b * i];
-        }
+    /* Calculate the row and column indices in matrix C */
+    uint row = index / width_b;
+    uint col = index % width_b;
+
+    /* Perform matrix multiplication for the element at the given index */
+    float sum = 0.0;
+    for (int k = 0; k < width_a; ++k) {
+        float a = matrix_a[row * width_a + k];
+        float b = matrix_b[k * width_b + col];
+        sum += a * b;
     }
+    matrix_c[index] = sum;
 }
