@@ -135,6 +135,11 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     physical_device_vulkan_1_2_features.timelineSemaphore = true;
 
+    /* enable required extentions */
+    const char *device_extensions[] = {
+        VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME};
+    const uint32_t device_extensions_count = 1;
+
     VkDeviceCreateInfo device_create_info = {0};
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     device_create_info.pNext = &physical_device_vulkan_1_2_features;
@@ -142,6 +147,9 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
         (different_queue_family) ? QUEUE_COUNT : 1;
     device_create_info.pQueueCreateInfos = queue_create_infos;
     device_create_info.pEnabledFeatures = &physical_device_features;
+
+    device_create_info.ppEnabledExtensionNames = device_extensions;
+    device_create_info.enabledExtensionCount = device_extensions_count;
 
     CHECK_VKRESULT_GOTO(vkCreateDevice(physical_device, &device_create_info,
                                        NULL, &device_internal->device),
@@ -175,10 +183,17 @@ void sccl_get_device_properties(const sccl_device_t device,
 {
     memset(device_properties, 0, sizeof(sccl_device_properties_t));
 
-    VkPhysicalDeviceSubgroupProperties physical_device_subgroup_properties = {};
+    VkPhysicalDeviceExternalMemoryHostPropertiesEXT
+        physical_device_external_memory_host_properties = {0};
+    physical_device_external_memory_host_properties.sType =
+        VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_EXTERNAL_MEMORY_HOST_PROPERTIES_EXT;
+    VkPhysicalDeviceSubgroupProperties physical_device_subgroup_properties = {
+        0};
     physical_device_subgroup_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SUBGROUP_PROPERTIES;
-    VkPhysicalDeviceProperties2 physical_device_properties = {};
+    physical_device_subgroup_properties.pNext =
+        &physical_device_external_memory_host_properties;
+    VkPhysicalDeviceProperties2 physical_device_properties = {0};
     physical_device_properties.sType =
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
     physical_device_properties.pNext = &physical_device_subgroup_properties;
@@ -211,4 +226,7 @@ void sccl_get_device_properties(const sccl_device_t device,
     device_properties->min_uniform_buffer_offset_alignment =
         physical_device_properties.properties.limits
             .minUniformBufferOffsetAlignment;
+    device_properties->min_external_buffer_host_pointer_alignment =
+        physical_device_external_memory_host_properties
+            .minImportedHostPointerAlignment;
 }
