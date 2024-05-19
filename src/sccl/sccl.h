@@ -39,7 +39,8 @@ typedef enum {
     sccl_buffer_type_shared = 3,
     sccl_buffer_type_host_uniform = 4,
     sccl_buffer_type_device_uniform = 5,
-    sccl_buffer_type_shared_uniform = 6
+    sccl_buffer_type_shared_uniform = 6,
+    sccl_buffer_type_external = 7
 } sccl_buffer_type_t;
 
 typedef struct sccl_instance *sccl_instance_t; /* opaque handle */
@@ -156,6 +157,10 @@ typedef struct {
      * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceLimits.html
      */
     size_t min_uniform_buffer_offset_alignment;
+    /* `minImportedHostPointerAlignment` from
+     * https://registry.khronos.org/vulkan/specs/1.3-extensions/man/html/VkPhysicalDeviceExternalMemoryHostPropertiesEXT.html
+     */
+    size_t min_external_buffer_host_pointer_alignment;
 } sccl_device_properties_t;
 
 /**
@@ -218,15 +223,30 @@ void sccl_get_device_properties(const sccl_device_t device,
                                 sccl_device_properties_t *device_properties);
 
 /**
- * Create buffer on device.
+ * Create buffer non-external buffer (memory allocated by sccl).
  * @param device Device.
  * @param buffer Buffer.
- * @param type Type of buffer, see `sccl_buffer_type_t`.
+ * @param type Type of buffer, see `sccl_buffer_type_t`,
+ * `sccl_buffer_type_external` is not supported by this call.
  * @param size Size in bytes.
  */
 sccl_error_t sccl_create_buffer(const sccl_device_t device,
                                 sccl_buffer_t *buffer, sccl_buffer_type_t type,
                                 size_t size);
+
+/**
+ * Pointer must be aligned to and a multiple of
+ * `sccl_device_properties_t::min_external_buffer_host_pointer_alignment`.
+ * Buffer handles created by this call are destroyed with `sccl_destroy_buffer`
+ * Buffers created from this call will be of type `sccl_buffer_type_external`.
+ * @param device Device.
+ * @param buffer Buffer.
+ * @param host_pointer Host pointer to register.
+ * @param size Size in bytes.
+ */
+sccl_error_t sccl_register_host_pointer_buffer(const sccl_device_t device,
+                                               sccl_buffer_t *buffer,
+                                               void *host_pointer, size_t size);
 
 /**
  * Destroy buffer.

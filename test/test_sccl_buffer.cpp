@@ -4,6 +4,7 @@
 
 #include "common.hpp"
 #include <gtest/gtest.h>
+#include <stdlib.h>
 
 class buffer_test : public testing::Test
 {
@@ -62,7 +63,8 @@ TEST_F(buffer_test, host_map_buffer)
     void *data_ptr = nullptr;
 
     for (sccl_buffer_type_t type :
-         {sccl_buffer_type_host, sccl_buffer_type_shared}) {
+         {sccl_buffer_type_host_storage, sccl_buffer_type_host_uniform,
+          sccl_buffer_type_shared_storage, sccl_buffer_type_shared_uniform}) {
         sccl_buffer_t buffer;
         EXPECT_EQ(sccl_create_buffer(device, &buffer, type, size),
                   sccl_success);
@@ -82,4 +84,34 @@ TEST_F(buffer_test, host_map_buffer)
 
         sccl_destroy_buffer(buffer);
     }
+}
+
+TEST_F(buffer_test, register_host_pointer_buffer)
+{
+    /* query import alignment requirement */
+    sccl_device_properties_t device_properties = {};
+    sccl_get_device_properties(device, &device_properties);
+
+    const std::vector<uint32_t> test_data = {0, 1, 2, 3, 4, 5, 6, 7};
+    const size_t size =
+        device_properties.min_external_buffer_host_pointer_alignment;
+    void *data_ptr = aligned_alloc(
+        device_properties.min_external_buffer_host_pointer_alignment, size);
+    ASSERT_NE(data_ptr, nullptr);
+
+    sccl_buffer_t buffer;
+
+    EXPECT_EQ(
+        sccl_register_host_pointer_buffer(device, &buffer, data_ptr, size),
+        sccl_success);
+
+    /* write to buffer */
+    memcpy(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t));
+
+    /* read from buffer */
+    EXPECT_EQ(
+        memcmp(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t)),
+        0);
+
+    sccl_destroy_buffer(buffer);
 }
