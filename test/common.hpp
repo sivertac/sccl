@@ -9,6 +9,11 @@
 #include <stdlib.h>
 #include <string>
 
+#define SCCL_TEST_ASSERT(error)                                                \
+    do {                                                                       \
+        ASSERT_EQ(error, sccl_success);                                        \
+    } while (0)
+
 inline uint32_t get_environment_gpu_index()
 {
     const char *str = getenv("SCCL_TEST_GPU_INDEX");

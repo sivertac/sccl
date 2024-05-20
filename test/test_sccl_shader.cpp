@@ -8,11 +8,10 @@ class shader_test : public testing::Test
 protected:
     void SetUp() override
     {
-        EXPECT_EQ(sccl_create_instance(&instance), sccl_success);
-        EXPECT_EQ(
-            sccl_create_device(instance, &device, get_environment_gpu_index()),
-            sccl_success);
-        EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_instance(&instance));
+        SCCL_TEST_ASSERT(
+            sccl_create_device(instance, &device, get_environment_gpu_index()));
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &stream));
     }
 
     void TearDown() override
@@ -34,12 +33,11 @@ init_output_buffer(const sccl_device_t device, size_t size,
                    sccl_shader_buffer_binding_t *output_buffer_binding)
 {
     void *data;
-    EXPECT_EQ(sccl_create_buffer(device, output_buffer, sccl_buffer_type_shared,
-                                 size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_buffer(device, output_buffer,
+                                        sccl_buffer_type_shared, size));
     /* init buffer to 0 */
-    EXPECT_EQ(sccl_host_map_buffer(*output_buffer, (void **)&data, 0, size),
-              sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_host_map_buffer(*output_buffer, (void **)&data, 0, size));
     memset((void *)data, 0, size);
     sccl_host_unmap_buffer(*output_buffer);
     sccl_set_buffer_layout_binding(*output_buffer, 0, 0, output_buffer_layout,
@@ -55,18 +53,17 @@ TEST_F(shader_test, shader_noop)
     shader_config.shader_source_code_length = shader_source.size();
 
     sccl_shader_t shader;
-    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
 
     /* run */
     sccl_shader_run_params_t params = {};
     params.group_count_x = 1;
 
-    EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+    SCCL_TEST_ASSERT(sccl_run_shader(stream, shader, &params));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
     sccl_destroy_shader(shader);
 }
@@ -102,17 +99,15 @@ TEST_F(shader_test, shader_buffer_layout)
     shader_config.buffer_layouts_count = binding_count;
 
     sccl_shader_t shader;
-    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
 
     /* create buffers */
     const size_t buffer_size = 0x1000;
     sccl_buffer_t buffers[binding_count];
     sccl_shader_buffer_binding_t bindings[binding_count];
     for (size_t i = 0; i < binding_count; ++i) {
-        EXPECT_EQ(sccl_create_buffer(device, &buffers[i],
-                                     buffer_layouts[i].type, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_buffer(
+            device, &buffers[i], buffer_layouts[i].type, buffer_size));
         bindings[i].position = buffer_layouts[i].position;
         bindings[i].buffer = buffers[i];
         /* make sure offset is at correct alignment */
@@ -130,11 +125,11 @@ TEST_F(shader_test, shader_buffer_layout)
     params.buffer_bindings = bindings;
     params.buffer_bindings_count = binding_count;
 
-    EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+    SCCL_TEST_ASSERT(sccl_run_shader(stream, shader, &params));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
     /* cleanup */
     for (size_t i = 0; i < binding_count; ++i) {
@@ -191,8 +186,7 @@ TEST_F(shader_test, shader_specialization_constants)
     shader_config.buffer_layouts_count = 1;
 
     sccl_shader_t shader;
-    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
 
     /* run */
     sccl_shader_run_params_t params = {};
@@ -202,16 +196,15 @@ TEST_F(shader_test, shader_specialization_constants)
     params.buffer_bindings = &output_buffer_binding;
     params.buffer_bindings_count = 1;
 
-    EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+    SCCL_TEST_ASSERT(sccl_run_shader(stream, shader, &params));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
     /* verify output data */
-    EXPECT_EQ(sccl_host_map_buffer(output_buffer, (void **)&output_data, 0,
-                                   output_buffer_size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(output_buffer, (void **)&output_data,
+                                          0, output_buffer_size));
     ASSERT_EQ(*(output_data + 0), c_0);
     ASSERT_EQ(*(output_data + 1), c_1);
     ASSERT_EQ(*(output_data + 2), c_2);
@@ -258,8 +251,7 @@ TEST_F(shader_test, shader_push_constants)
     shader_config.buffer_layouts_count = 1;
 
     sccl_shader_t shader;
-    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
 
     /* run */
     PushConstant push_constant = {};
@@ -280,17 +272,16 @@ TEST_F(shader_test, shader_push_constants)
     params.buffer_bindings = &output_buffer_binding;
     params.buffer_bindings_count = 1;
 
-    EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+    SCCL_TEST_ASSERT(sccl_run_shader(stream, shader, &params));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
     /* verify output data */
-    EXPECT_EQ(sccl_host_map_buffer(output_buffer, (void **)&output_data, 0,
-                                   output_buffer_size),
-              sccl_success);
-    EXPECT_EQ(memcmp(output_data, &push_constant, sizeof(PushConstant)), 0);
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(output_buffer, (void **)&output_data,
+                                          0, output_buffer_size));
+    ASSERT_EQ(memcmp(output_data, &push_constant, sizeof(PushConstant)), 0);
     sccl_host_unmap_buffer(output_buffer);
 
     /* cleanup */
@@ -313,18 +304,14 @@ TEST_F(shader_test, shader_copy_buffer)
     sccl_buffer_t host_output_buffer;
     sccl_buffer_t device_input_buffer;
     sccl_buffer_t device_output_buffer;
-    EXPECT_EQ(sccl_create_buffer(device, &host_input_buffer,
-                                 sccl_buffer_type_host, buffer_size),
-              sccl_success);
-    EXPECT_EQ(sccl_create_buffer(device, &host_output_buffer,
-                                 sccl_buffer_type_host, buffer_size),
-              sccl_success);
-    EXPECT_EQ(sccl_create_buffer(device, &device_input_buffer,
-                                 sccl_buffer_type_device, buffer_size),
-              sccl_success);
-    EXPECT_EQ(sccl_create_buffer(device, &device_output_buffer,
-                                 sccl_buffer_type_device, buffer_size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_buffer(device, &host_input_buffer,
+                                        sccl_buffer_type_host, buffer_size));
+    SCCL_TEST_ASSERT(sccl_create_buffer(device, &host_output_buffer,
+                                        sccl_buffer_type_host, buffer_size));
+    SCCL_TEST_ASSERT(sccl_create_buffer(device, &device_input_buffer,
+                                        sccl_buffer_type_device, buffer_size));
+    SCCL_TEST_ASSERT(sccl_create_buffer(device, &device_output_buffer,
+                                        sccl_buffer_type_device, buffer_size));
     sccl_shader_buffer_layout_t device_input_buffer_layout = {};
     sccl_shader_buffer_binding_t device_input_buffer_binding = {};
     sccl_set_buffer_layout_binding(device_input_buffer, 0, 0,
@@ -338,12 +325,10 @@ TEST_F(shader_test, shader_copy_buffer)
 
     void *input_data;
     void *output_data;
-    EXPECT_EQ(
-        sccl_host_map_buffer(host_input_buffer, &input_data, 0, buffer_size),
-        sccl_success);
-    EXPECT_EQ(
-        sccl_host_map_buffer(host_output_buffer, &output_data, 0, buffer_size),
-        sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_host_map_buffer(host_input_buffer, &input_data, 0, buffer_size));
+    SCCL_TEST_ASSERT(
+        sccl_host_map_buffer(host_output_buffer, &output_data, 0, buffer_size));
 
     /* create shader */
     sccl_shader_buffer_layout_t buffer_layouts[] = {
@@ -354,8 +339,7 @@ TEST_F(shader_test, shader_copy_buffer)
     shader_config.buffer_layouts = buffer_layouts;
     shader_config.buffer_layouts_count = 2;
     sccl_shader_t shader;
-    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
 
     /* run */
     for (size_t run = 0; run < run_count; ++run) {
@@ -367,9 +351,8 @@ TEST_F(shader_test, shader_copy_buffer)
             *(((uint32_t *)input_data) + i) = i;
         }
 
-        EXPECT_EQ(sccl_copy_buffer(stream, host_input_buffer, 0,
-                                   device_input_buffer, 0, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_copy_buffer(stream, host_input_buffer, 0,
+                                          device_input_buffer, 0, buffer_size));
 
         sccl_shader_buffer_binding_t buffer_bindings[] = {
             device_input_buffer_binding, device_output_buffer_binding};
@@ -379,21 +362,20 @@ TEST_F(shader_test, shader_copy_buffer)
         params.group_count_z = 1;
         params.buffer_bindings = buffer_bindings;
         params.buffer_bindings_count = 2;
-        EXPECT_EQ(sccl_run_shader(stream, shader, &params), sccl_success);
+        SCCL_TEST_ASSERT(sccl_run_shader(stream, shader, &params));
 
-        EXPECT_EQ(sccl_copy_buffer(stream, device_output_buffer, 0,
-                                   host_output_buffer, 0, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_copy_buffer(stream, device_output_buffer, 0,
+                                          host_output_buffer, 0, buffer_size));
 
-        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-        EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
         /* verify output data */
         for (uint32_t i = 0; i < buffer_element_count; ++i) {
             *(((uint32_t *)input_data) + i) = i;
 
-            EXPECT_EQ(*(((uint32_t *)output_data) + i), i / 2);
+            ASSERT_EQ(*(((uint32_t *)output_data) + i), i / 2);
         }
     }
 
@@ -431,30 +413,28 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
     std::vector<void *> input_datas(stream_count);
     std::vector<void *> output_datas(stream_count);
     for (size_t i = 0; i < stream_count; ++i) {
-        EXPECT_EQ(sccl_create_buffer(device, &host_input_buffers[i],
-                                     sccl_buffer_type_host, buffer_size),
-                  sccl_success);
-        EXPECT_EQ(sccl_create_buffer(device, &host_output_buffers[i],
-                                     sccl_buffer_type_host, buffer_size),
-                  sccl_success);
-        EXPECT_EQ(sccl_create_buffer(device, &device_input_buffers[i],
-                                     sccl_buffer_type_device, buffer_size),
-                  sccl_success);
-        EXPECT_EQ(sccl_create_buffer(device, &device_output_buffers[i],
-                                     sccl_buffer_type_device, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_buffer(device, &host_input_buffers[i],
+                                            sccl_buffer_type_host,
+                                            buffer_size));
+        SCCL_TEST_ASSERT(sccl_create_buffer(device, &host_output_buffers[i],
+                                            sccl_buffer_type_host,
+                                            buffer_size));
+        SCCL_TEST_ASSERT(sccl_create_buffer(device, &device_input_buffers[i],
+                                            sccl_buffer_type_device,
+                                            buffer_size));
+        SCCL_TEST_ASSERT(sccl_create_buffer(device, &device_output_buffers[i],
+                                            sccl_buffer_type_device,
+                                            buffer_size));
         sccl_set_buffer_layout_binding(device_input_buffers[i], 0, 0,
                                        &device_input_buffer_layouts[i],
                                        &device_input_buffer_bindings[i]);
         sccl_set_buffer_layout_binding(device_output_buffers[i], 0, 1,
                                        &device_output_buffer_layouts[i],
                                        &device_output_buffer_bindings[i]);
-        EXPECT_EQ(sccl_host_map_buffer(host_input_buffers[i], &input_datas[i],
-                                       0, buffer_size),
-                  sccl_success);
-        EXPECT_EQ(sccl_host_map_buffer(host_output_buffers[i], &output_datas[i],
-                                       0, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_host_map_buffer(host_input_buffers[i],
+                                              &input_datas[i], 0, buffer_size));
+        SCCL_TEST_ASSERT(sccl_host_map_buffer(
+            host_output_buffers[i], &output_datas[i], 0, buffer_size));
     }
 
     /* create shader */
@@ -472,8 +452,7 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
      * dispatch enought concurrent shaders */
     shader_config.max_concurrent_buffer_bindings = stream_count;
     sccl_shader_t shader;
-    EXPECT_EQ(sccl_create_shader(device, &shader, &shader_config),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
 
     /* init buffers */
     for (size_t i = 0; i < stream_count; ++i) {
@@ -489,14 +468,14 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
     /* create streams */
     std::vector<sccl_stream_t> streams(stream_count);
     for (size_t i = 0; i < stream_count; ++i) {
-        EXPECT_EQ(sccl_create_stream(device, &streams[i]), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &streams[i]));
     }
 
     /* run */
     for (size_t i = 0; i < stream_count; ++i) {
-        EXPECT_EQ(sccl_copy_buffer(streams[i], host_input_buffers[i], 0,
-                                   device_input_buffers[i], 0, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_copy_buffer(streams[i], host_input_buffers[i], 0,
+                                          device_input_buffers[i], 0,
+                                          buffer_size));
 
         sccl_shader_buffer_binding_t buffer_bindings[] = {
             device_input_buffer_bindings[i], device_output_buffer_bindings[i]};
@@ -506,23 +485,23 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
         params.group_count_z = 1;
         params.buffer_bindings = buffer_bindings;
         params.buffer_bindings_count = 2;
-        ASSERT_EQ(sccl_run_shader(streams[i], shader, &params), sccl_success);
+        SCCL_TEST_ASSERT(sccl_run_shader(streams[i], shader, &params));
 
-        EXPECT_EQ(sccl_copy_buffer(streams[i], device_output_buffers[i], 0,
-                                   host_output_buffers[i], 0, buffer_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_copy_buffer(streams[i], device_output_buffers[i],
+                                          0, host_output_buffers[i], 0,
+                                          buffer_size));
 
-        EXPECT_EQ(sccl_dispatch_stream(streams[i]), sccl_success);
+        SCCL_TEST_ASSERT(sccl_dispatch_stream(streams[i]));
     }
 
     for (size_t i = 0; i < stream_count; ++i) {
-        EXPECT_EQ(sccl_join_stream(streams[i]), sccl_success);
+        SCCL_TEST_ASSERT(sccl_join_stream(streams[i]));
     }
 
     /* verify output data */
     for (size_t i = 0; i < stream_count; ++i) {
         for (uint32_t j = 0; j < buffer_element_count; ++j) {
-            EXPECT_EQ(*(((uint32_t *)output_datas[i]) + j), j / 2);
+            ASSERT_EQ(*(((uint32_t *)output_datas[i]) + j), j / 2);
         }
     }
 

@@ -25,6 +25,7 @@ pip install pre-commit
 or
 ```
 apt-get install pre-commit
+pre-commit install
 ```
 
 ## Interesting ideas for SCCL

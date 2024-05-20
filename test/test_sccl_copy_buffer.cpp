@@ -10,11 +10,10 @@ class copy_buffer_test : public testing::Test
 protected:
     void SetUp() override
     {
-        EXPECT_EQ(sccl_create_instance(&instance), sccl_success);
-        EXPECT_EQ(
-            sccl_create_device(instance, &device, get_environment_gpu_index()),
-            sccl_success);
-        EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_instance(&instance));
+        SCCL_TEST_ASSERT(
+            sccl_create_device(instance, &device, get_environment_gpu_index()));
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &stream));
 
         /* generate test data */
         test_data.reserve(test_data_size);
@@ -52,7 +51,7 @@ static void create_buffer_generic(const sccl_device_t device,
                                   void **external_ptr)
 {
     if (type != sccl_buffer_type_external) {
-        EXPECT_EQ(sccl_create_buffer(device, buffer, type, size), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_buffer(device, buffer, type, size));
     } else {
         /* query import alignment requirement */
         sccl_device_properties_t device_properties = {};
@@ -67,9 +66,8 @@ static void create_buffer_generic(const sccl_device_t device,
             device_properties.min_external_buffer_host_pointer_alignment,
             aligned_size);
         ASSERT_NE(*external_ptr, nullptr);
-        EXPECT_EQ(sccl_register_host_pointer_buffer(
-                      device, buffer, *external_ptr, aligned_size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_register_host_pointer_buffer(
+            device, buffer, *external_ptr, aligned_size));
     }
 }
 
@@ -95,41 +93,38 @@ void copy_buffer_test::buffer_write_read_test(sccl_buffer_type_t source_type,
 
     /* zero init all of host buffer */
     void *host_data_ptr;
-    EXPECT_EQ(sccl_host_map_buffer(source_buffer, &host_data_ptr, 0,
-                                   source_buffer_size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(source_buffer, &host_data_ptr, 0,
+                                          source_buffer_size));
     memset(host_data_ptr, 0, source_buffer_size);
     sccl_host_unmap_buffer(source_buffer);
 
     /* copy test data to first half of host buffer */
-    EXPECT_EQ(sccl_host_map_buffer(source_buffer, &host_data_ptr, 0,
-                                   test_data_byte_size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(source_buffer, &host_data_ptr, 0,
+                                          test_data_byte_size));
     memcpy(host_data_ptr, test_data.data(), source_buffer_size / 2);
 
     /* check host buffer */
-    EXPECT_EQ(memcmp(static_cast<uint32_t *>(host_data_ptr) + 0,
+    ASSERT_EQ(memcmp(static_cast<uint32_t *>(host_data_ptr) + 0,
                      test_data.data(), test_data_byte_size),
               0);
     sccl_host_unmap_buffer(source_buffer);
 
     /* copy to device */
-    EXPECT_EQ(sccl_copy_buffer(stream, source_buffer, 0, target_buffer, 0,
-                               test_data_byte_size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_copy_buffer(stream, source_buffer, 0, target_buffer,
+                                      0, test_data_byte_size));
     /* copy back to host, but at offset */
-    EXPECT_EQ(sccl_copy_buffer(stream, target_buffer, 0, source_buffer,
-                               test_data_byte_size, test_data_byte_size),
-              sccl_success);
+    SCCL_TEST_ASSERT(sccl_copy_buffer(stream, target_buffer, 0, source_buffer,
+                                      test_data_byte_size,
+                                      test_data_byte_size));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
     /* map host buffer at offset and check data */
-    EXPECT_EQ(sccl_host_map_buffer(source_buffer, &host_data_ptr,
-                                   test_data_byte_size, test_data_byte_size),
-              sccl_success);
-    EXPECT_EQ(memcmp(static_cast<uint32_t *>(host_data_ptr), test_data.data(),
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(source_buffer, &host_data_ptr,
+                                          test_data_byte_size,
+                                          test_data_byte_size));
+    ASSERT_EQ(memcmp(static_cast<uint32_t *>(host_data_ptr), test_data.data(),
                      test_data_byte_size),
               0);
     sccl_host_unmap_buffer(source_buffer);

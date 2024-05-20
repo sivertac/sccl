@@ -11,10 +11,9 @@ class buffer_test : public testing::Test
 protected:
     void SetUp() override
     {
-        EXPECT_EQ(sccl_create_instance(&instance), sccl_success);
-        EXPECT_EQ(
-            sccl_create_device(instance, &device, get_environment_gpu_index()),
-            sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_instance(&instance));
+        SCCL_TEST_ASSERT(
+            sccl_create_device(instance, &device, get_environment_gpu_index()));
     }
 
     void TearDown() override
@@ -31,8 +30,8 @@ TEST_F(buffer_test, create_host_buffer)
 {
     size_t size = 0x1000;
     sccl_buffer_t buffer;
-    EXPECT_EQ(sccl_create_buffer(device, &buffer, sccl_buffer_type_host, size),
-              sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_create_buffer(device, &buffer, sccl_buffer_type_host, size));
     sccl_destroy_buffer(buffer);
 }
 
@@ -40,9 +39,8 @@ TEST_F(buffer_test, create_device_buffer)
 {
     size_t size = 0x1000;
     sccl_buffer_t buffer;
-    EXPECT_EQ(
-        sccl_create_buffer(device, &buffer, sccl_buffer_type_device, size),
-        sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_create_buffer(device, &buffer, sccl_buffer_type_device, size));
     sccl_destroy_buffer(buffer);
 }
 
@@ -50,9 +48,8 @@ TEST_F(buffer_test, create_shared_buffer)
 {
     size_t size = 0x1000;
     sccl_buffer_t buffer;
-    EXPECT_EQ(
-        sccl_create_buffer(device, &buffer, sccl_buffer_type_shared, size),
-        sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_create_buffer(device, &buffer, sccl_buffer_type_shared, size));
     sccl_destroy_buffer(buffer);
 }
 
@@ -66,17 +63,15 @@ TEST_F(buffer_test, host_map_buffer)
          {sccl_buffer_type_host_storage, sccl_buffer_type_host_uniform,
           sccl_buffer_type_shared_storage, sccl_buffer_type_shared_uniform}) {
         sccl_buffer_t buffer;
-        EXPECT_EQ(sccl_create_buffer(device, &buffer, type, size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_buffer(device, &buffer, type, size));
 
-        EXPECT_EQ(sccl_host_map_buffer(buffer, &data_ptr, 0, size),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_host_map_buffer(buffer, &data_ptr, 0, size));
 
         /* write to buffer */
         memcpy(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t));
 
         /* read from buffer */
-        EXPECT_EQ(memcmp(data_ptr, test_data.data(),
+        ASSERT_EQ(memcmp(data_ptr, test_data.data(),
                          test_data.size() * sizeof(uint32_t)),
                   0);
 
@@ -101,17 +96,18 @@ TEST_F(buffer_test, register_host_pointer_buffer)
 
     sccl_buffer_t buffer;
 
-    EXPECT_EQ(
-        sccl_register_host_pointer_buffer(device, &buffer, data_ptr, size),
-        sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_register_host_pointer_buffer(device, &buffer, data_ptr, size));
 
     /* write to buffer */
     memcpy(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t));
 
     /* read from buffer */
-    EXPECT_EQ(
+    ASSERT_EQ(
         memcmp(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t)),
         0);
 
+    /* cleanup */
     sccl_destroy_buffer(buffer);
+    free(data_ptr);
 }
