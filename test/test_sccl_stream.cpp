@@ -10,10 +10,9 @@ class stream_test : public testing::Test
 protected:
     void SetUp() override
     {
-        EXPECT_EQ(sccl_create_instance(&instance), sccl_success);
-        EXPECT_EQ(
-            sccl_create_device(instance, &device, get_environment_gpu_index()),
-            sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_instance(&instance));
+        SCCL_TEST_ASSERT(
+            sccl_create_device(instance, &device, get_environment_gpu_index()));
     }
 
     void TearDown() override
@@ -29,7 +28,7 @@ protected:
 TEST_F(stream_test, create_stream)
 {
     sccl_stream_t stream;
-    EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_stream(device, &stream));
     sccl_destroy_stream(stream);
 }
 
@@ -37,15 +36,15 @@ TEST_F(stream_test, dispatch_and_join)
 {
     sccl_stream_t stream;
 
-    EXPECT_EQ(sccl_create_stream(device, &stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_create_stream(device, &stream));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
-    EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
 
-    EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
 
     sccl_destroy_stream(stream);
 }
@@ -58,15 +57,15 @@ TEST_F(stream_test, dispatch_and_join_multiple)
 
     for (size_t i = 0; i < stream_count; ++i) {
         streams.push_back({});
-        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &streams.back()));
     }
 
     for (sccl_stream_t stream : streams) {
-        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
     }
 
     for (sccl_stream_t stream : streams) {
-        EXPECT_EQ(sccl_join_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_join_stream(stream));
     }
 
     for (sccl_stream_t stream : streams) {
@@ -82,21 +81,21 @@ TEST_F(stream_test, dispatch_and_wait)
 
     for (size_t i = 0; i < stream_count; ++i) {
         streams.push_back({});
-        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &streams.back()));
     }
 
     for (sccl_stream_t stream : streams) {
-        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
     }
 
     /* wait for first to trigger for actual test */
-    EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count, NULL),
-              sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_wait_streams(device, streams.data(), stream_count, nullptr));
 
     /* wait for rest so valitaion layer won't complain about unsignaled fences
      */
-    EXPECT_EQ(sccl_wait_streams_all(device, streams.data(), stream_count),
-              sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_wait_streams_all(device, streams.data(), stream_count));
 
     for (sccl_stream_t stream : streams) {
         sccl_destroy_stream(stream);
@@ -112,18 +111,17 @@ TEST_F(stream_test, dispatch_and_wait_completed_list)
 
     for (size_t i = 0; i < stream_count; ++i) {
         streams.push_back({});
-        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &streams.back()));
     }
 
     for (sccl_stream_t stream : streams) {
-        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
     }
 
     /* wait */
     while (true) {
-        EXPECT_EQ(sccl_wait_streams(device, streams.data(), stream_count,
-                                    completed_list.data()),
-                  sccl_success);
+        SCCL_TEST_ASSERT(sccl_wait_streams(device, streams.data(), stream_count,
+                                           completed_list.data()));
         bool not_complete = false;
         for (size_t i = 0; i < stream_count; ++i) {
             if (completed_list[i] == 0) {
@@ -153,15 +151,15 @@ TEST_F(stream_test, dispatch_and_wait_all)
 
     for (size_t i = 0; i < stream_count; ++i) {
         streams.push_back({});
-        EXPECT_EQ(sccl_create_stream(device, &streams.back()), sccl_success);
+        SCCL_TEST_ASSERT(sccl_create_stream(device, &streams.back()));
     }
 
     for (sccl_stream_t stream : streams) {
-        EXPECT_EQ(sccl_dispatch_stream(stream), sccl_success);
+        SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
     }
 
-    EXPECT_EQ(sccl_wait_streams_all(device, streams.data(), stream_count),
-              sccl_success);
+    SCCL_TEST_ASSERT(
+        sccl_wait_streams_all(device, streams.data(), stream_count));
 
     for (sccl_stream_t stream : streams) {
         sccl_destroy_stream(stream);
