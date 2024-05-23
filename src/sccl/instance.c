@@ -101,7 +101,8 @@ static sccl_error_t check_validation_layer_support(bool *supported)
 
         for (size_t i = 0; i < layer_count; ++i) {
             VkLayerProperties *layer_properties = &available_layers[i];
-            if (strcmp(layer_name, layer_properties->layerName) == 0) {
+            if (strncmp(layer_name, layer_properties->layerName,
+                        VK_MAX_EXTENSION_NAME_SIZE) == 0) {
                 layer_found = true;
                 break;
             }

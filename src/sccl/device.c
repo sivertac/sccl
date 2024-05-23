@@ -73,6 +73,108 @@ static sccl_error_t find_queue_family_index(VkPhysicalDevice physical_device,
     return sccl_success;
 }
 
+static sccl_error_t check_device_extension_support(
+    VkPhysicalDevice physical_device, const char **check_extension_names,
+    size_t check_extension_names_count, bool *supported)
+{
+    sccl_error_t error = sccl_success;
+
+    uint32_t available_extension_properties_list_count = 0;
+    VkExtensionProperties *available_extension_properties_list = NULL;
+
+    CHECK_VKRESULT_GOTO(vkEnumerateDeviceExtensionProperties(
+                            physical_device, NULL,
+                            &available_extension_properties_list_count, NULL),
+                        error_return, error);
+
+    CHECK_SCCL_ERROR_GOTO(
+        sccl_calloc((void **)&available_extension_properties_list,
+                    available_extension_properties_list_count,
+                    sizeof(VkExtensionProperties)),
+        error_return, error);
+
+    CHECK_VKRESULT_GOTO(vkEnumerateDeviceExtensionProperties(
+                            physical_device, NULL,
+                            &available_extension_properties_list_count,
+                            available_extension_properties_list),
+                        error_return, error);
+
+    size_t found_count = 0;
+    for (size_t available_extension_index = 0;
+         available_extension_index < available_extension_properties_list_count;
+         ++available_extension_index) {
+        VkExtensionProperties *extension_properties =
+            &available_extension_properties_list[available_extension_index];
+        for (size_t i = 0; i < check_extension_names_count; ++i) {
+            if (strncmp(check_extension_names[i],
+                        extension_properties->extensionName,
+                        VK_MAX_EXTENSION_NAME_SIZE) == 0) {
+                ++found_count;
+            }
+        }
+    }
+
+    sccl_free(available_extension_properties_list);
+
+    *supported = !(found_count < check_extension_names_count);
+
+    return sccl_success;
+
+error_return:
+    if (available_extension_properties_list != NULL) {
+        sccl_free(available_extension_properties_list);
+    }
+
+    return error;
+}
+
+static const char *all_wanted_device_extension_names[] = {
+    VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME,
+    VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
+    VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME};
+static const uint32_t all_wanted_device_extension_names_count = 3;
+
+/**
+ * device_extension_names must of of size
+ * all_wanted_device_extension_names_count. device_extension_names_count is set
+ * by this function
+ */
+static sccl_error_t determine_device_extensions(
+    VkPhysicalDevice physical_device, char **device_extension_names,
+    size_t *device_extension_names_count, bool *host_pointer_supported,
+    bool *dmabuf_buffer_supported)
+{
+    assert(all_wanted_device_extension_names_count ==
+           sizeof(all_wanted_device_extension_names) / sizeof(const char *));
+
+    *device_extension_names_count = 0;
+
+    /* check host pointer support */
+    const char *host_pointer_ext_names[] = {
+        VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME};
+    CHECK_SCCL_ERROR_RET(check_device_extension_support(
+        physical_device, host_pointer_ext_names, 1, host_pointer_supported));
+    if (*host_pointer_supported) {
+        memcpy((void *)(device_extension_names + *device_extension_names_count),
+               host_pointer_ext_names, 1 * sizeof(const char *));
+        *device_extension_names_count += 1;
+    }
+
+    /* check dmabuf support */
+    const char *dmabuf_ext_names[] = {
+        VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
+        VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME};
+    CHECK_SCCL_ERROR_RET(check_device_extension_support(
+        physical_device, dmabuf_ext_names, 2, dmabuf_buffer_supported));
+    if (*dmabuf_buffer_supported) {
+        memcpy((void *)(device_extension_names + *device_extension_names_count),
+               dmabuf_ext_names, 2 * sizeof(const char *));
+        *device_extension_names_count += 2;
+    }
+
+    return sccl_success;
+}
+
 bool has_seperate_transfer_queue(const sccl_device_t device)
 {
     return device->compute_queue_family_index !=
@@ -85,6 +187,10 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
     sccl_error_t error = sccl_success;
 
     struct sccl_device *device_internal = NULL;
+
+    char **device_extensions = NULL;
+    size_t device_extensions_count = 0;
+
     CHECK_SCCL_ERROR_GOTO(
         sccl_calloc((void **)&device_internal, 1, sizeof(struct sccl_device)),
         error_return, error);
@@ -135,10 +241,17 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
         VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
     physical_device_vulkan_1_2_features.timelineSemaphore = true;
 
-    /* enable required extentions */
-    const char *device_extensions[] = {
-        VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME};
-    const uint32_t device_extensions_count = 1;
+    /* enable extentions if available */
+    CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&device_extensions,
+                                      all_wanted_device_extension_names_count,
+                                      sizeof(char *)),
+                          error_return, error);
+    CHECK_SCCL_ERROR_GOTO(
+        determine_device_extensions(physical_device, device_extensions,
+                                    &device_extensions_count,
+                                    &device_internal->host_pointer_supported,
+                                    &device_internal->dmabuf_buffer_supported),
+        error_return, error);
 
     VkDeviceCreateInfo device_create_info = {0};
     device_create_info.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
@@ -148,12 +261,26 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
     device_create_info.pQueueCreateInfos = queue_create_infos;
     device_create_info.pEnabledFeatures = &physical_device_features;
 
-    device_create_info.ppEnabledExtensionNames = device_extensions;
+    device_create_info.ppEnabledExtensionNames =
+        (const char *const *)device_extensions;
     device_create_info.enabledExtensionCount = device_extensions_count;
 
     CHECK_VKRESULT_GOTO(vkCreateDevice(physical_device, &device_create_info,
                                        NULL, &device_internal->device),
                         error_return, error);
+
+    /* dynamically load extension API calls */
+    if (device_internal->dmabuf_buffer_supported) {
+        device_internal->pfn_vk_get_memory_fd_khr =
+            (PFN_vkGetMemoryFdKHR)vkGetDeviceProcAddr(device_internal->device,
+                                                      "vkGetMemoryFdKHR");
+        device_internal->pfn_vk_get_memory_fd_properties_khr =
+            (PFN_vkGetMemoryFdPropertiesKHR)vkGetDeviceProcAddr(
+                device_internal->device, "vkGetMemoryFdPropertiesKHR");
+    }
+
+    /* cleanup */
+    sccl_free(device_extensions);
 
     /* set public handle */
     *device = (sccl_device_t)device_internal;
@@ -161,6 +288,11 @@ sccl_error_t sccl_create_device(const sccl_instance_t instance,
     return sccl_success;
 
 error_return:
+
+    if (device_extensions != NULL) {
+        sccl_free(device_extensions);
+    }
+
     if (device_internal != NULL) {
         if (device_internal->device != VK_NULL_HANDLE) {
             vkDestroyDevice(device_internal->device, NULL);

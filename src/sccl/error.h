@@ -9,48 +9,55 @@
 #include <stdio.h>
 #include <vulkan/vk_enum_string_helper.h>
 
-#define UNWRAP_VKRESULT(result)                                                \
+#define UNWRAP_VKRESULT(cmd)                                                   \
     do {                                                                       \
-        if (result != VK_SUCCESS) {                                            \
-            fprintf(stderr, "Vulkan error: %s\n", string_VkResult(result));    \
+        VkResult UNWRAP_VKRESULT_result = cmd;                                 \
+        if (UNWRAP_VKRESULT_result != VK_SUCCESS) {                            \
+            fprintf(stderr, "Vulkan error: %s\n",                              \
+                    string_VkResult(UNWRAP_VKRESULT_result));                  \
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)
 
 /* Check `VkResult`, if success then continue, else return
  * `sccl_unhandled_vulkan_error` */
-#define CHECK_VKRESULT_RET(result)                                             \
+#define CHECK_VKRESULT_RET(cmd)                                                \
     do {                                                                       \
-        if (result != VK_SUCCESS) {                                            \
+        VkResult CHECK_VKRESULT_RET_result = cmd;                              \
+        if (CHECK_VKRESULT_RET_result != VK_SUCCESS) {                         \
             return sccl_unhandled_vulkan_error;                                \
         }                                                                      \
     } while (0)
 
 /* Check `VkResult`, if success then continue, else goto `goto_label`, , store
  * sccl error in `store_sccl_error` if error */
-#define CHECK_VKRESULT_GOTO(result, goto_label, store_sccl_error)              \
+#define CHECK_VKRESULT_GOTO(cmd, goto_label, store_sccl_error)                 \
     do {                                                                       \
-        if (result != VK_SUCCESS) {                                            \
-            fprintf(stderr, "Vulkan error: %s\n", string_VkResult(result));    \
+        VkResult CHECK_VKRESULT_GOTO_result = cmd;                             \
+        if (CHECK_VKRESULT_GOTO_result != VK_SUCCESS) {                        \
+            fprintf(stderr, "Vulkan error: %s\n",                              \
+                    string_VkResult(CHECK_VKRESULT_GOTO_result));              \
             store_sccl_error = sccl_unhandled_vulkan_error;                    \
             goto goto_label;                                                   \
         }                                                                      \
     } while (0)
 
 /* Check `sccl_error_t`, if success then continue, else return error */
-#define CHECK_SCCL_ERROR_RET(error)                                            \
+#define CHECK_SCCL_ERROR_RET(cmd)                                              \
     do {                                                                       \
-        if (error != sccl_success) {                                           \
-            return error;                                                      \
+        sccl_error_t CHECK_SCCL_ERROR_RET_error = cmd;                         \
+        if (CHECK_SCCL_ERROR_RET_error != sccl_success) {                      \
+            return CHECK_SCCL_ERROR_RET_error;                                 \
         }                                                                      \
     } while (0)
 
 /* Check `sccl_error_t`, if success then continue, else goto `goto_label`, store
  * sccl error in `store_sccl_error` if error */
-#define CHECK_SCCL_ERROR_GOTO(error, goto_label, store_sccl_error)             \
+#define CHECK_SCCL_ERROR_GOTO(cmd, goto_label, store_sccl_error)               \
     do {                                                                       \
-        if (error != sccl_success) {                                           \
-            store_sccl_error = error;                                          \
+        sccl_error_t CHECK_SCCL_ERROR_GOTO_error = cmd;                        \
+        if (CHECK_SCCL_ERROR_GOTO_error != sccl_success) {                     \
+            store_sccl_error = CHECK_SCCL_ERROR_GOTO_error;                    \
             goto goto_label;                                                   \
         }                                                                      \
     } while (0)

@@ -81,7 +81,7 @@ TEST_F(buffer_test, host_map_buffer)
     }
 }
 
-TEST_F(buffer_test, register_host_pointer_buffer)
+TEST_F(buffer_test, create_host_pointer_buffer)
 {
     /* query import alignment requirement */
     sccl_device_properties_t device_properties = {};
@@ -96,8 +96,12 @@ TEST_F(buffer_test, register_host_pointer_buffer)
 
     sccl_buffer_t buffer;
 
-    SCCL_TEST_ASSERT(
-        sccl_register_host_pointer_buffer(device, &buffer, data_ptr, size));
+    sccl_error_t error =
+        sccl_create_host_pointer_buffer(device, &buffer, data_ptr, size);
+    if (error == sccl_unsupported_error) {
+        GTEST_SKIP() << "Skipping test, sccl_unsupported_error";
+    }
+    SCCL_TEST_ASSERT(error);
 
     /* write to buffer */
     memcpy(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t));
@@ -110,4 +114,51 @@ TEST_F(buffer_test, register_host_pointer_buffer)
     /* cleanup */
     sccl_destroy_buffer(buffer);
     free(data_ptr);
+}
+
+TEST_F(buffer_test, create_dmabuf_buffer)
+{
+    /* query import alignment requirement */
+    sccl_device_properties_t device_properties = {};
+    sccl_get_device_properties(device, &device_properties);
+
+    const std::vector<uint32_t> test_data = {0, 1, 2, 3, 4, 5, 6, 7};
+    const size_t size =
+        device_properties.min_external_buffer_host_pointer_alignment;
+
+    sccl_buffer_t buffer;
+
+    sccl_error_t error = sccl_create_dmabuf_buffer(
+        device, &buffer, sccl_buffer_type_host_uniform, size);
+    if (error == sccl_unsupported_error) {
+        GTEST_SKIP() << "Skipping test, sccl_unsupported_error";
+    }
+    SCCL_TEST_ASSERT(error);
+
+    int fd;
+    SCCL_TEST_ASSERT(sccl_export_dmabuf_buffer(buffer, &fd));
+
+    sccl_buffer_t import_buffer;
+    SCCL_TEST_ASSERT(sccl_import_dmabuf_buffer(
+        device, &import_buffer, fd, sccl_buffer_type_host_uniform, size));
+
+    /* map initial buffer and write to it */
+    void *data_ptr = nullptr;
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(buffer, &data_ptr, 0, size));
+    memset(data_ptr, 0, size);
+    memcpy(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t));
+    sccl_host_unmap_buffer(buffer);
+
+    /* map imported buffer and read from it */
+    /* read from buffer */
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(import_buffer, &data_ptr, 0, size));
+    ASSERT_EQ(
+        memcmp(data_ptr, test_data.data(), test_data.size() * sizeof(uint32_t)),
+        0);
+    sccl_host_unmap_buffer(import_buffer);
+
+    /* cleanup */
+    sccl_destroy_buffer(import_buffer);
+    close(fd);
+    sccl_destroy_buffer(buffer);
 }

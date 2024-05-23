@@ -9,9 +9,10 @@
 #include <stdlib.h>
 #include <string>
 
-#define SCCL_TEST_ASSERT(error)                                                \
+#define SCCL_TEST_ASSERT(cmd)                                                  \
     do {                                                                       \
-        ASSERT_EQ(error, sccl_success);                                        \
+        sccl_error_t SCCL_TEST_ASSERT_error = cmd;                             \
+        ASSERT_EQ(SCCL_TEST_ASSERT_error, sccl_success);                       \
     } while (0)
 
 inline uint32_t get_environment_gpu_index()

@@ -44,12 +44,14 @@ protected:
 
 /**
  * `external_ptr` is only set if type is `sccl_buffer_type_external`.
+ * supported set to false if buffer type is not supported.
  */
 static void create_buffer_generic(const sccl_device_t device,
                                   sccl_buffer_t *buffer,
                                   sccl_buffer_type_t type, size_t size,
-                                  void **external_ptr)
+                                  void **external_ptr, bool *supported)
 {
+    sccl_error_t error = sccl_success;
     if (type != sccl_buffer_type_external) {
         SCCL_TEST_ASSERT(sccl_create_buffer(device, buffer, type, size));
     } else {
@@ -66,9 +68,15 @@ static void create_buffer_generic(const sccl_device_t device,
             device_properties.min_external_buffer_host_pointer_alignment,
             aligned_size);
         ASSERT_NE(*external_ptr, nullptr);
-        SCCL_TEST_ASSERT(sccl_register_host_pointer_buffer(
-            device, buffer, *external_ptr, aligned_size));
+        error = sccl_create_host_pointer_buffer(device, buffer, *external_ptr,
+                                                aligned_size);
+        if (error == sccl_unsupported_error) {
+            free(*external_ptr);
+            *supported = false;
+        }
+        SCCL_TEST_ASSERT(error);
     }
+    *supported = true;
 }
 
 void copy_buffer_test::buffer_write_read_test(sccl_buffer_type_t source_type,
@@ -86,10 +94,19 @@ void copy_buffer_test::buffer_write_read_test(sccl_buffer_type_t source_type,
     void *target_external_ptr = nullptr;
 
     /* create buffers */
+    bool supported = false;
     create_buffer_generic(device, &source_buffer, source_type,
-                          source_buffer_size, &source_external_ptr);
+                          source_buffer_size, &source_external_ptr, &supported);
+    if (!supported) {
+        /* skip, this permutation is not supported on this device */
+        return;
+    }
     create_buffer_generic(device, &target_buffer, target_type,
-                          target_buffer_size, &target_external_ptr);
+                          target_buffer_size, &target_external_ptr, &supported);
+    if (!supported) {
+        /* skip, this permutation is not supported on this device */
+        return;
+    }
 
     /* zero init all of host buffer */
     void *host_data_ptr;
