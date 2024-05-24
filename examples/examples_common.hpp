@@ -10,18 +10,22 @@
 #include <type_traits>
 #include <vulkan/vk_enum_string_helper.h>
 
-#define UNWRAP_VKRESULT(result)                                                \
+#define UNWRAP_VKRESULT(cmd)                                                   \
     do {                                                                       \
-        if (result != VK_SUCCESS) {                                            \
-            fprintf(stderr, "Vulkan error: %s\n", string_VkResult(result));    \
+        VkResult UNWRAP_VKRESULT_result = cmd;                                 \
+        if (UNWRAP_VKRESULT_result != VK_SUCCESS) {                            \
+            fprintf(stderr, "Vulkan error: %s\n",                              \
+                    string_VkResult(UNWRAP_VKRESULT_result));                  \
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)
 
-#define UNWRAP_SCCL_ERROR(error)                                               \
+#define UNWRAP_SCCL_ERROR(cmd)                                                 \
     do {                                                                       \
-        if (error != sccl_success) {                                           \
-            fprintf(stderr, "SCCL error: %s\n", sccl_get_error_string(error)); \
+        sccl_error_t UNWRAP_SCCL_ERROR_error = cmd;                            \
+        if (UNWRAP_SCCL_ERROR_error != sccl_success) {                         \
+            fprintf(stderr, "SCCL error: %s\n",                                \
+                    sccl_get_error_string(UNWRAP_SCCL_ERROR_error));           \
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
     } while (0)
@@ -161,12 +165,12 @@ template <class Container> void print_container(const Container &container)
 }
 
 template <typename T>
-bool float_equal(T a, T b,
-                        T epsilon = std::numeric_limits<T>::epsilon())
+bool float_equal(T a, T b, T epsilon = std::numeric_limits<T>::epsilon())
 {
     T abs_th = std::numeric_limits<T>::min();
     T diff = std::abs(a - b);
-    T norm = std::min((std::fabs(a) + std::fabs(b)), std::numeric_limits<T>::max());
+    T norm =
+        std::min((std::fabs(a) + std::fabs(b)), std::numeric_limits<T>::max());
     return diff < std::max(abs_th, epsilon * norm);
 }
 

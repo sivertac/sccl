@@ -78,16 +78,85 @@ allocate_buffer_internal(const sccl_device_t device,
     return sccl_success;
 }
 
+static sccl_error_t create_buffer_internal(
+    const sccl_device_t device, struct sccl_buffer **buffer_internal,
+    sccl_buffer_type_t type, size_t size, VkBufferUsageFlags buffer_usage_flags,
+    VkMemoryPropertyFlags memory_property_flags, void *buffer_create_info_pnext,
+    void *memory_allocate_info_pnext)
+{
+    sccl_error_t error = sccl_success;
+
+    CHECK_SCCL_ERROR_GOTO(
+        allocate_buffer_internal(device, buffer_internal, type), error_return,
+        error);
+
+    /* create buffer */
+    VkBufferCreateInfo buffer_create_info = {0};
+    buffer_create_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    buffer_create_info.pNext = buffer_create_info_pnext;
+    buffer_create_info.size = size;
+    buffer_create_info.usage = buffer_usage_flags;
+    buffer_create_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    CHECK_VKRESULT_GOTO(vkCreateBuffer((*buffer_internal)->device->device,
+                                       &buffer_create_info, NULL,
+                                       &(*buffer_internal)->buffer),
+                        error_return, error);
+
+    /* get memory requirements */
+    VkMemoryRequirements mem_requirements = {0};
+    vkGetBufferMemoryRequirements((*buffer_internal)->device->device,
+                                  (*buffer_internal)->buffer,
+                                  &mem_requirements);
+
+    /* find memory type */
+    uint32_t memory_type_index;
+    CHECK_SCCL_ERROR_GOTO(find_memory_type(device->physical_device,
+                                           mem_requirements.memoryTypeBits,
+                                           memory_property_flags,
+                                           &memory_type_index),
+                          error_return, error);
+
+    /* allocate memory */
+    VkMemoryAllocateInfo memory_allocate_info = {0};
+    memory_allocate_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memory_allocate_info.pNext = memory_allocate_info_pnext;
+    memory_allocate_info.allocationSize = mem_requirements.size;
+    memory_allocate_info.memoryTypeIndex = memory_type_index;
+    CHECK_VKRESULT_GOTO(vkAllocateMemory((*buffer_internal)->device->device,
+                                         &memory_allocate_info, NULL,
+                                         &(*buffer_internal)->device_memory),
+                        error_return, error);
+
+    /* bind */
+    CHECK_VKRESULT_GOTO(vkBindBufferMemory((*buffer_internal)->device->device,
+                                           (*buffer_internal)->buffer,
+                                           (*buffer_internal)->device_memory,
+                                           0),
+                        error_return, error);
+
+    return sccl_success;
+
+error_return:
+    if (*buffer_internal != NULL) {
+        if ((*buffer_internal)->device_memory != VK_NULL_HANDLE) {
+            vkFreeMemory(device->device, (*buffer_internal)->device_memory,
+                         NULL);
+        }
+        if ((*buffer_internal)->buffer != VK_NULL_HANDLE) {
+            vkDestroyBuffer(device->device, (*buffer_internal)->buffer, NULL);
+        }
+        sccl_free(*buffer_internal);
+    }
+
+    return error;
+}
+
 sccl_error_t sccl_create_buffer(const sccl_device_t device,
                                 sccl_buffer_t *buffer, sccl_buffer_type_t type,
                                 size_t size)
 {
-    sccl_error_t error = sccl_success;
 
     struct sccl_buffer *buffer_internal = NULL;
-    CHECK_SCCL_ERROR_GOTO(
-        allocate_buffer_internal(device, &buffer_internal, type), error_return,
-        error);
 
     /* determine buffer usage flags */
     VkBufferUsageFlags buffer_usage_flags = 0;
@@ -101,22 +170,6 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     }
     buffer_usage_flags |=
         VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-    /* create buffer */
-    VkBufferCreateInfo buffer_info = {0};
-    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_info.size = size;
-    buffer_info.usage = buffer_usage_flags;
-    buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    CHECK_VKRESULT_GOTO(vkCreateBuffer(buffer_internal->device->device,
-                                       &buffer_info, NULL,
-                                       &buffer_internal->buffer),
-                        error_return, error);
-
-    /* get memory requirements */
-    VkMemoryRequirements mem_requirements = {0};
-    vkGetBufferMemoryRequirements(buffer_internal->device->device,
-                                  buffer_internal->buffer, &mem_requirements);
 
     /* determine memory property flags */
     VkMemoryPropertyFlags memory_property_flags;
@@ -141,59 +194,26 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
         return sccl_invalid_argument;
     }
 
-    /* find memory type */
-    uint32_t memory_type_index;
-    CHECK_SCCL_ERROR_GOTO(find_memory_type(device->physical_device,
-                                           mem_requirements.memoryTypeBits,
-                                           memory_property_flags,
-                                           &memory_type_index),
-                          error_return, error);
-
-    /* allocate memory */
-    VkMemoryAllocateInfo alloc_info = {0};
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.allocationSize = mem_requirements.size;
-    alloc_info.memoryTypeIndex = memory_type_index;
-    CHECK_VKRESULT_GOTO(vkAllocateMemory(buffer_internal->device->device,
-                                         &alloc_info, NULL,
-                                         &buffer_internal->device_memory),
-                        error_return, error);
-
-    /* bind */
-    CHECK_VKRESULT_GOTO(vkBindBufferMemory(buffer_internal->device->device,
-                                           buffer_internal->buffer,
-                                           buffer_internal->device_memory, 0),
-                        error_return, error);
+    CHECK_SCCL_ERROR_RET(create_buffer_internal(
+        device, &buffer_internal, type, size, buffer_usage_flags,
+        memory_property_flags, NULL, NULL));
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;
 
     return sccl_success;
-
-error_return:
-    if (buffer_internal != NULL) {
-        if (buffer_internal->device_memory != VK_NULL_HANDLE) {
-            vkFreeMemory(device->device, buffer_internal->device_memory, NULL);
-        }
-        if (buffer_internal->buffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device->device, buffer_internal->buffer, NULL);
-        }
-        sccl_free(buffer_internal);
-    }
-
-    return error;
 }
 
-sccl_error_t sccl_register_host_pointer_buffer(const sccl_device_t device,
-                                               sccl_buffer_t *buffer,
-                                               void *host_pointer, size_t size)
+sccl_error_t sccl_create_host_pointer_buffer(const sccl_device_t device,
+                                             sccl_buffer_t *buffer,
+                                             void *host_pointer, size_t size)
 {
-    sccl_error_t error = sccl_success;
-
     struct sccl_buffer *buffer_internal = NULL;
-    CHECK_SCCL_ERROR_GOTO(allocate_buffer_internal(device, &buffer_internal,
-                                                   sccl_buffer_type_external),
-                          error_return, error);
+
+    /* check if supported */
+    if (!device->host_pointer_supported) {
+        return sccl_unsupported_error;
+    }
 
     /* create buffer for external memory */
     VkExternalMemoryBufferCreateInfo external_memory_buffer_create_info = {0};
@@ -202,36 +222,11 @@ sccl_error_t sccl_register_host_pointer_buffer(const sccl_device_t device,
     external_memory_buffer_create_info.handleTypes =
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
 
-    VkBufferCreateInfo buffer_info = {0};
-    buffer_info.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
-    buffer_info.pNext = &external_memory_buffer_create_info;
-    buffer_info.size = size;
-    buffer_info.usage =
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-    // buffer_info.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-    CHECK_VKRESULT_GOTO(vkCreateBuffer(buffer_internal->device->device,
-                                       &buffer_info, NULL,
-                                       &buffer_internal->buffer),
-                        error_return, error);
-
-    /* get memory requirements */
-    VkMemoryRequirements mem_requirements = {0};
-    vkGetBufferMemoryRequirements(buffer_internal->device->device,
-                                  buffer_internal->buffer, &mem_requirements);
-
     VkMemoryPropertyFlags memory_property_flags =
         VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
         VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
-    /* find memory type */
-    uint32_t memory_type_index;
-    CHECK_SCCL_ERROR_GOTO(find_memory_type(device->physical_device,
-                                           mem_requirements.memoryTypeBits,
-                                           memory_property_flags,
-                                           &memory_type_index),
-                          error_return, error);
-
-    /* allocate memory */
+    /* use host pointer ext */
     VkImportMemoryHostPointerInfoEXT import_memory_host_pointer_info = {0};
     import_memory_host_pointer_info.sType =
         VK_STRUCTURE_TYPE_IMPORT_MEMORY_HOST_POINTER_INFO_EXT;
@@ -239,39 +234,185 @@ sccl_error_t sccl_register_host_pointer_buffer(const sccl_device_t device,
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
     import_memory_host_pointer_info.pHostPointer = host_pointer;
 
-    VkMemoryAllocateInfo alloc_info = {0};
-    alloc_info.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
-    alloc_info.pNext = &import_memory_host_pointer_info;
-    alloc_info.allocationSize = mem_requirements.size;
-    alloc_info.memoryTypeIndex = memory_type_index;
-    CHECK_VKRESULT_GOTO(vkAllocateMemory(buffer_internal->device->device,
-                                         &alloc_info, NULL,
-                                         &buffer_internal->device_memory),
-                        error_return, error);
-
-    /* bind */
-    CHECK_VKRESULT_GOTO(vkBindBufferMemory(buffer_internal->device->device,
-                                           buffer_internal->buffer,
-                                           buffer_internal->device_memory, 0),
-                        error_return, error);
+    CHECK_SCCL_ERROR_RET(create_buffer_internal(
+        device, &buffer_internal, sccl_buffer_type_external, size,
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
+        memory_property_flags, &external_memory_buffer_create_info,
+        &import_memory_host_pointer_info));
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;
 
     return sccl_success;
+}
 
-error_return:
-    if (buffer_internal != NULL) {
-        if (buffer_internal->device_memory != VK_NULL_HANDLE) {
-            vkFreeMemory(device->device, buffer_internal->device_memory, NULL);
-        }
-        if (buffer_internal->buffer != VK_NULL_HANDLE) {
-            vkDestroyBuffer(device->device, buffer_internal->buffer, NULL);
-        }
-        sccl_free(buffer_internal);
+sccl_error_t sccl_create_dmabuf_buffer(const sccl_device_t device,
+                                       sccl_buffer_t *buffer,
+                                       sccl_buffer_type_t type, size_t size)
+{
+    struct sccl_buffer *buffer_internal = NULL;
+
+    /* check if supported */
+    if (!device->dmabuf_buffer_supported) {
+        return sccl_unsupported_error;
     }
 
-    return error;
+    /* determine buffer usage flags */
+    VkBufferUsageFlags buffer_usage_flags = 0;
+    /* check if buffer is storage or uniform */
+    if (is_buffer_type_storage(type)) {
+        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    } else if (is_buffer_type_uniform(type)) {
+        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    } else {
+        return sccl_invalid_argument;
+    }
+    buffer_usage_flags |=
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    /* determine memory property flags */
+    VkMemoryPropertyFlags memory_property_flags;
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_host_uniform:
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        break;
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_device_uniform:
+        memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        break;
+    case sccl_buffer_type_shared_storage:
+    case sccl_buffer_type_shared_uniform:
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        /* `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` makes shared buffer turbo slow
+         * to read back to CPU */
+        break;
+    default:
+        return sccl_invalid_argument;
+    }
+
+    VkExternalMemoryBufferCreateInfo external_memory_buffer_create_info = {0};
+    external_memory_buffer_create_info.sType =
+        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+    external_memory_buffer_create_info.handleTypes =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+
+    VkExportMemoryAllocateInfo export_memory_allocate_info = {0};
+    export_memory_allocate_info.sType =
+        VK_STRUCTURE_TYPE_EXPORT_MEMORY_ALLOCATE_INFO;
+    export_memory_allocate_info.handleTypes =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+
+    CHECK_SCCL_ERROR_RET(create_buffer_internal(
+        device, &buffer_internal, sccl_buffer_type_external, size,
+        buffer_usage_flags, memory_property_flags,
+        &external_memory_buffer_create_info, &export_memory_allocate_info));
+
+    /* set public handle */
+    *buffer = (sccl_buffer_t)buffer_internal;
+
+    return sccl_success;
+}
+
+sccl_error_t sccl_export_dmabuf_buffer(const sccl_buffer_t buffer, int *out_fd)
+{
+    /* check if supported */
+    if (!buffer->device->dmabuf_buffer_supported) {
+        return sccl_unsupported_error;
+    }
+
+    VkMemoryGetFdInfoKHR memory_get_fd_info = {0};
+    memory_get_fd_info.sType = VK_STRUCTURE_TYPE_MEMORY_GET_FD_INFO_KHR;
+    memory_get_fd_info.memory = buffer->device_memory;
+    memory_get_fd_info.handleType =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+    CHECK_VKRESULT_RET(buffer->device->pfn_vk_get_memory_fd_khr(
+        buffer->device->device, &memory_get_fd_info, out_fd));
+
+    return sccl_success;
+}
+
+sccl_error_t sccl_import_dmabuf_buffer(const sccl_device_t device,
+                                       sccl_buffer_t *buffer, int in_fd,
+                                       sccl_buffer_type_t type, size_t size)
+{
+    struct sccl_buffer *buffer_internal = NULL;
+
+    /* check if supported */
+    if (!device->dmabuf_buffer_supported) {
+        return sccl_unsupported_error;
+    }
+
+    /* query memory import info */
+    VkMemoryFdPropertiesKHR memory_fd_properties = {0};
+    memory_fd_properties.sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
+    CHECK_VKRESULT_RET(device->pfn_vk_get_memory_fd_properties_khr(
+        device->device, VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT, in_fd,
+        &memory_fd_properties));
+    // printf("memory_fd_properties.memoryTypeBits = %d\n",
+    // memory_fd_properties.memoryTypeBits);
+
+    /* determine buffer usage flags */
+    VkBufferUsageFlags buffer_usage_flags = 0;
+    /* check if buffer is storage or uniform */
+    if (is_buffer_type_storage(type)) {
+        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    } else if (is_buffer_type_uniform(type)) {
+        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    } else {
+        return sccl_invalid_argument;
+    }
+    buffer_usage_flags |=
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    /* determine memory property flags */
+    VkMemoryPropertyFlags memory_property_flags;
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_host_uniform:
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        break;
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_device_uniform:
+        memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+        break;
+    case sccl_buffer_type_shared_storage:
+    case sccl_buffer_type_shared_uniform:
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        /* `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` makes shared buffer turbo slow
+         * to read back to CPU */
+        break;
+    default:
+        return sccl_invalid_argument;
+    }
+
+    /* create buffer for external memory */
+    VkExternalMemoryBufferCreateInfo external_memory_buffer_create_info = {0};
+    external_memory_buffer_create_info.sType =
+        VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
+    external_memory_buffer_create_info.handleTypes =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+
+    /* use VK_KHR_external_memory_fd */
+    VkImportMemoryFdInfoKHR import_memory_fd_info = {0};
+    import_memory_fd_info.sType = VK_STRUCTURE_TYPE_IMPORT_MEMORY_FD_INFO_KHR;
+    import_memory_fd_info.handleType =
+        VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
+    import_memory_fd_info.fd = in_fd;
+
+    CHECK_SCCL_ERROR_RET(create_buffer_internal(
+        device, &buffer_internal, type, size, buffer_usage_flags,
+        memory_property_flags, &external_memory_buffer_create_info,
+        &import_memory_fd_info));
+
+    /* set public handle */
+    *buffer = (sccl_buffer_t)buffer_internal;
+
+    return sccl_success;
 }
 
 void sccl_destroy_buffer(sccl_buffer_t buffer)

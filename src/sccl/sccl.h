@@ -362,11 +362,30 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
  * `sccl_device_properties_t::min_external_buffer_host_pointer_alignment`.
  *
  * @return An `sccl_error_t` code indicating the success or failure of the
- * buffer registration.
+ * buffer registration. `sccl_unsupported_error` is returned if device does not
+ * support host pointer buffers.
  */
-sccl_error_t sccl_register_host_pointer_buffer(const sccl_device_t device,
-                                               sccl_buffer_t *buffer,
-                                               void *host_pointer, size_t size);
+sccl_error_t sccl_create_host_pointer_buffer(const sccl_device_t device,
+                                             sccl_buffer_t *buffer,
+                                             void *host_pointer, size_t size);
+
+/**
+ * @return An `sccl_error_t` code indicating the success or failure of the
+ * buffer creation. `sccl_unsupported_error` is returned if device does not
+ * support dmabuf buffers.
+ */
+sccl_error_t sccl_create_dmabuf_buffer(const sccl_device_t device,
+                                       sccl_buffer_t *buffer,
+                                       sccl_buffer_type_t type, size_t size);
+
+/**
+ * @note `out_fd` has to be closed when cleaning up.
+ */
+sccl_error_t sccl_export_dmabuf_buffer(const sccl_buffer_t buffer, int *out_fd);
+
+sccl_error_t sccl_import_dmabuf_buffer(const sccl_device_t device,
+                                       sccl_buffer_t *buffer, int in_fd,
+                                       sccl_buffer_type_t type, size_t size);
 
 /**
  * @brief Destroy the specified buffer.
