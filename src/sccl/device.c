@@ -144,6 +144,7 @@ static sccl_error_t determine_device_extensions(
     size_t *device_extension_names_count, bool *host_pointer_supported,
     bool *dmabuf_buffer_supported)
 {
+    (void)all_wanted_device_extension_names;
     assert(all_wanted_device_extension_names_count ==
            sizeof(all_wanted_device_extension_names) / sizeof(const char *));
 
