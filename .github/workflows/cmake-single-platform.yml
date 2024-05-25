@@ -8,8 +8,6 @@ on:
   pull_request:
     branches: [ "master" ]
 
-env:
-
 jobs:
   build-and-test:
     strategy: 
@@ -26,11 +24,11 @@ jobs:
       run: wget -qO- https://packages.lunarg.com/lunarg-signing-key-pub.asc | sudo tee /etc/apt/trusted.gpg.d/lunarg.asc && sudo wget -qO /etc/apt/sources.list.d/lunarg-vulkan-jammy.list https://packages.lunarg.com/vulkan/lunarg-vulkan-jammy.list && sudo apt-get -y update && sudo apt-get install -y vulkan-sdk mesa-utils mesa-vulkan-drivers libvulkan1 vulkan-tools vulkan-validationlayers clang
 
     - name: Configure CMake gcc
-      if: ${{matrix.compiler == "gcc"}}
+      if: ${{matrix.compiler == 'gcc'}}
       run:  CC=gcc CXX=g++ cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
 
     - name: Configure CMake clang
-      if: ${{matrix.compiler == "clang"}}
+      if: ${{matrix.compiler == 'clang'}}
       run:  CC=clang CXX=clang++ cmake -B ${{github.workspace}}/build -DCMAKE_BUILD_TYPE=${{matrix.build_type}}
 
     - name: Build
