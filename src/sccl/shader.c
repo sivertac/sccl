@@ -158,9 +158,9 @@ sccl_buffer_type_to_vk_descriptor_type(const sccl_buffer_type_t type)
     case sccl_buffer_type_shared_uniform:
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     default:
+        assert(false);
+        return 0;
     }
-    assert(false);
-    return 0;
 }
 
 static void
@@ -316,6 +316,11 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
 {
     sccl_error_t error;
 
+    struct sccl_shader *shader_internal = NULL;
+    VkPushConstantRange *push_constant_ranges = NULL;
+    VkSpecializationMapEntry *specialization_map_entries = NULL;
+    void *specialization_data = NULL;
+
     /* validate config */
     CHECK_SCCL_NULL_RET(config);
     CHECK_SCCL_NULL_RET(config->shader_source_code);
@@ -324,7 +329,6 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
     }
 
     /* create internal handle */
-    struct sccl_shader *shader_internal = NULL;
     CHECK_SCCL_ERROR_GOTO(
         sccl_calloc((void **)&shader_internal, 1, sizeof(struct sccl_shader)),
         error_return, error);
@@ -390,12 +394,11 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
             config->specialization_constants[i].size;
     }
     /* allocate specialization data memory and entries */
-    void *specialization_data = NULL;
     CHECK_SCCL_ERROR_GOTO(sccl_calloc(&specialization_data,
                                       total_specialization_constant_size,
                                       sizeof(uint8_t)),
                           error_return, error);
-    VkSpecializationMapEntry *specialization_map_entries = NULL;
+
     CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&specialization_map_entries,
                                       config->specialization_constants_count,
                                       sizeof(VkSpecializationMapEntry)),
@@ -420,7 +423,6 @@ sccl_error_t sccl_create_shader(const sccl_device_t device,
 
     /* prepare push constants */
     /* create push constant range for each entry */
-    VkPushConstantRange *push_constant_ranges = NULL;
     if (config->push_constant_layouts_count > 0) {
         CHECK_SCCL_ERROR_GOTO(sccl_calloc((void **)&push_constant_ranges,
                                           config->push_constant_layouts_count,
