@@ -19,6 +19,6 @@ const char *sccl_get_error_string(sccl_error_t error)
     case sccl_out_of_resources_error:
         return "Out of resources error";
     default:
+        return NULL;
     }
-    return NULL;
 }

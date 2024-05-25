@@ -137,7 +137,7 @@ static const uint32_t all_wanted_device_extension_names_count = 3;
 /**
  * device_extension_names must of of size
  * all_wanted_device_extension_names_count. device_extension_names_count is set
- * by this function
+ * by this function.
  */
 static sccl_error_t determine_device_extensions(
     VkPhysicalDevice physical_device, char **device_extension_names,
@@ -153,24 +153,31 @@ static sccl_error_t determine_device_extensions(
     /* check host pointer support */
     const char *host_pointer_ext_names[] = {
         VK_EXT_EXTERNAL_MEMORY_HOST_EXTENSION_NAME};
+    const size_t host_pointer_ext_names_count =
+        sizeof(host_pointer_ext_names) / sizeof(char *);
     CHECK_SCCL_ERROR_RET(check_device_extension_support(
-        physical_device, host_pointer_ext_names, 1, host_pointer_supported));
+        physical_device, host_pointer_ext_names, host_pointer_ext_names_count,
+        host_pointer_supported));
     if (*host_pointer_supported) {
         memcpy((void *)(device_extension_names + *device_extension_names_count),
-               host_pointer_ext_names, 1 * sizeof(const char *));
-        *device_extension_names_count += 1;
+               host_pointer_ext_names,
+               host_pointer_ext_names_count * sizeof(const char *));
+        *device_extension_names_count += host_pointer_ext_names_count;
     }
 
     /* check dmabuf support */
     const char *dmabuf_ext_names[] = {
         VK_KHR_EXTERNAL_MEMORY_FD_EXTENSION_NAME,
         VK_EXT_EXTERNAL_MEMORY_DMA_BUF_EXTENSION_NAME};
+    const size_t dmabuf_ext_names_count =
+        sizeof(dmabuf_ext_names) / sizeof(char *);
     CHECK_SCCL_ERROR_RET(check_device_extension_support(
-        physical_device, dmabuf_ext_names, 2, dmabuf_buffer_supported));
+        physical_device, dmabuf_ext_names, dmabuf_ext_names_count,
+        dmabuf_buffer_supported));
     if (*dmabuf_buffer_supported) {
         memcpy((void *)(device_extension_names + *device_extension_names_count),
-               dmabuf_ext_names, 2 * sizeof(const char *));
-        *device_extension_names_count += 2;
+               dmabuf_ext_names, dmabuf_ext_names_count * sizeof(const char *));
+        *device_extension_names_count += dmabuf_ext_names_count;
     }
 
     return sccl_success;
