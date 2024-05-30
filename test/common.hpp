@@ -4,6 +4,7 @@
 
 #include <inttypes.h>
 #include <optional>
+#include <sccl.h>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -68,5 +69,9 @@ inline std::optional<std::string> read_test_shader(const char *shader_file_name)
                       std::string(shader_file_name))
                          .c_str());
 }
+
+void create_buffer_generic(const sccl_device_t device, sccl_buffer_t *buffer,
+                           sccl_buffer_type_t type, size_t size,
+                           void **external_ptr, bool *supported);
 
 #endif // COMMON_HEADER

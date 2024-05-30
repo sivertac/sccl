@@ -42,43 +42,6 @@ protected:
                                 sccl_buffer_type_t target_type);
 };
 
-/**
- * `external_ptr` is only set if type is `sccl_buffer_type_external`.
- * supported set to false if buffer type is not supported.
- */
-static void create_buffer_generic(const sccl_device_t device,
-                                  sccl_buffer_t *buffer,
-                                  sccl_buffer_type_t type, size_t size,
-                                  void **external_ptr, bool *supported)
-{
-    sccl_error_t error = sccl_success;
-    if (type != sccl_buffer_type_external) {
-        SCCL_TEST_ASSERT(sccl_create_buffer(device, buffer, type, size));
-    } else {
-        /* query import alignment requirement */
-        sccl_device_properties_t device_properties = {};
-        sccl_get_device_properties(device, &device_properties);
-        const size_t aligned_size =
-            size +
-            (size %
-             device_properties.min_external_buffer_host_pointer_alignment);
-        /* set external_ptr so wwe maintain a reference to underlying memory in
-         * case of external memory */
-        *external_ptr = aligned_alloc(
-            device_properties.min_external_buffer_host_pointer_alignment,
-            aligned_size);
-        ASSERT_NE(*external_ptr, nullptr);
-        error = sccl_create_host_pointer_buffer(device, buffer, *external_ptr,
-                                                aligned_size);
-        if (error == sccl_unsupported_error) {
-            free(*external_ptr);
-            *supported = false;
-        }
-        SCCL_TEST_ASSERT(error);
-    }
-    *supported = true;
-}
-
 void copy_buffer_test::buffer_write_read_test(sccl_buffer_type_t source_type,
                                               sccl_buffer_type_t target_type)
 {
@@ -86,8 +49,8 @@ void copy_buffer_test::buffer_write_read_test(sccl_buffer_type_t source_type,
     sccl_buffer_t target_buffer;
     /* host buffer is twice as big so we can fit test data in first half, and
      * data received from gpu in second half */
-    size_t source_buffer_size = test_data_byte_size * 2;
-    size_t target_buffer_size = test_data_byte_size;
+    const size_t source_buffer_size = test_data_byte_size * 2;
+    const size_t target_buffer_size = test_data_byte_size;
 
     /* external memory */
     void *source_external_ptr = nullptr;
@@ -163,12 +126,14 @@ TEST_F(copy_buffer_test, all_valid_permutations)
     for (sccl_buffer_type_t src_type :
          {sccl_buffer_type_host_storage, sccl_buffer_type_shared_storage,
           sccl_buffer_type_host_uniform, sccl_buffer_type_shared_uniform,
-          sccl_buffer_type_external}) {
+          sccl_buffer_type_external_host_pointer_storage,
+          sccl_buffer_type_external_host_pointer_uniform}) {
         for (sccl_buffer_type_t dst_type :
              {sccl_buffer_type_host_storage, sccl_buffer_type_shared_storage,
               sccl_buffer_type_host_uniform, sccl_buffer_type_shared_uniform,
               sccl_buffer_type_device_storage, sccl_buffer_type_device_uniform,
-              sccl_buffer_type_external}) {
+              sccl_buffer_type_external_host_pointer_storage,
+              sccl_buffer_type_external_host_pointer_uniform}) {
             buffer_write_read_test(src_type, dst_type);
         }
     }

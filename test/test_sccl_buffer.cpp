@@ -81,7 +81,7 @@ TEST_F(buffer_test, host_map_buffer)
     }
 }
 
-TEST_F(buffer_test, create_host_pointer_buffer)
+TEST_F(buffer_test, create_external_host_pointer_buffer)
 {
     /* query import alignment requirement */
     sccl_device_properties_t device_properties = {};
@@ -96,8 +96,9 @@ TEST_F(buffer_test, create_host_pointer_buffer)
 
     sccl_buffer_t buffer;
 
-    sccl_error_t error =
-        sccl_create_host_pointer_buffer(device, &buffer, data_ptr, size);
+    sccl_error_t error = sccl_create_external_host_pointer_buffer(
+        device, &buffer, sccl_buffer_type_external_host_pointer_storage,
+        data_ptr, size);
     if (error == sccl_unsupported_error) {
         GTEST_SKIP() << "Skipping test, sccl_unsupported_error";
     }
@@ -129,7 +130,7 @@ TEST_F(buffer_test, create_dmabuf_buffer)
     sccl_buffer_t buffer;
 
     sccl_error_t error = sccl_create_dmabuf_buffer(
-        device, &buffer, sccl_buffer_type_host_uniform, size);
+        device, &buffer, sccl_buffer_type_host_dmabuf_storage, size);
     if (error == sccl_unsupported_error) {
         GTEST_SKIP() << "Skipping test, sccl_unsupported_error";
     }
@@ -139,8 +140,9 @@ TEST_F(buffer_test, create_dmabuf_buffer)
     SCCL_TEST_ASSERT(sccl_export_dmabuf_buffer(buffer, &fd));
 
     sccl_buffer_t import_buffer;
-    SCCL_TEST_ASSERT(sccl_import_dmabuf_buffer(
-        device, &import_buffer, fd, sccl_buffer_type_host_uniform, size));
+    SCCL_TEST_ASSERT(
+        sccl_import_dmabuf_buffer(device, &import_buffer, fd,
+                                  sccl_buffer_type_host_dmabuf_storage, size));
 
     /* map initial buffer and write to it */
     void *data_ptr = nullptr;

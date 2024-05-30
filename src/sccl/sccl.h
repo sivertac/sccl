@@ -64,8 +64,28 @@ typedef enum {
         5, /**< Buffer type for device uniform memory. */
     sccl_buffer_type_shared_uniform =
         6, /**< Buffer type for shared uniform memory. */
-    sccl_buffer_type_external =
-        7 /**< Buffer type for externally allocated memory. */
+    sccl_buffer_type_external_host_pointer_storage =
+        7, /**< Buffer type for external allocated host pointer storage memory.
+            */
+    sccl_buffer_type_external_host_pointer_uniform =
+        8, /**< Buffer type for external allocated host pointer uniform memory.
+            */
+    sccl_buffer_type_host_dmabuf_storage =
+        9, /**< Buffer type for host dmabuf storage memory. */
+    sccl_buffer_type_device_dmabuf_storage =
+        10, /**< Buffer type for device dmabuf storage memory. */
+    sccl_buffer_type_shared_dmabuf_storage =
+        11, /**< Buffer type for shared dmabuf storage memory. */
+    sccl_buffer_type_host_dmabuf_uniform =
+        12, /**< Buffer type for host dmabuf uniform memory. */
+    sccl_buffer_type_device_dmabuf_uniform =
+        13, /**< Buffer type for device dmabuf uniform memory. */
+    sccl_buffer_type_shared_dmabuf_uniform =
+        14, /**< Buffer type for shared dmabuf uniform memory. */
+    sccl_buffer_type_external_dmabuf_storage =
+        15, /**< Buffer type for external dmabuf storage memory. */
+    sccl_buffer_type_external_dmabuf_uniform =
+        16 /**< Buffer type for external dmabuf uniform memory. */
 } sccl_buffer_type_t;
 
 typedef struct sccl_instance *sccl_instance_t; /* opaque handle */
@@ -343,8 +363,7 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
  * This function registers a host pointer as an external buffer with the given
  * SCCL device. The provided host pointer must be aligned to and a multiple of
  * the minimum external buffer host pointer alignment specified in the device
- * properties. Buffers created by this call will be of type
- * `sccl_buffer_type_external`.
+ * properties.
  *
  * @note Buffer handles created by this call must be destroyed using
  * `sccl_destroy_buffer`.
@@ -354,6 +373,9 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
  * `sccl_create_device`.
  * @param[out] buffer A pointer to an `sccl_buffer_t` structure that will be
  * initialized by this function. This parameter cannot be NULL.
+ * @param[in] type Buffer type, must be
+ * `sccl_buffer_type_external_host_pointer_storage` or
+ * `sccl_buffer_type_external_host_pointer_storage`.
  * @param[in] host_pointer The host pointer to be registered as an external
  * buffer, must be aligned to
  * `sccl_device_properties_t::min_external_buffer_host_pointer_alignment`.
@@ -365,9 +387,9 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
  * buffer registration. `sccl_unsupported_error` is returned if device does not
  * support host pointer buffers.
  */
-sccl_error_t sccl_create_host_pointer_buffer(const sccl_device_t device,
-                                             sccl_buffer_t *buffer,
-                                             void *host_pointer, size_t size);
+sccl_error_t sccl_create_external_host_pointer_buffer(
+    const sccl_device_t device, sccl_buffer_t *buffer, sccl_buffer_type_t type,
+    void *host_pointer, size_t size);
 
 /**
  * @return An `sccl_error_t` code indicating the success or failure of the

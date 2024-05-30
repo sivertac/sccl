@@ -33,7 +33,7 @@ static command_buffer_entry_t *
 get_current_command_buffer(vector_t *command_buffers)
 {
     if (vector_get_size(command_buffers) <= 0) {
-        return 0;
+        return NULL;
     }
     return vector_get_last_element(command_buffers);
 }
