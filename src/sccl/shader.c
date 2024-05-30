@@ -154,6 +154,7 @@ sccl_buffer_type_to_vk_descriptor_type(const sccl_buffer_type_t type)
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     }
     assert(0);
+    return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 }
 
 static void

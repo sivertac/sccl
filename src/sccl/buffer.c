@@ -45,7 +45,7 @@ static VkBufferUsageFlags get_buffer_usage_flags(sccl_buffer_type_t type)
 static VkMemoryPropertyFlags get_memory_property_flags(sccl_buffer_type_t type)
 {
     /* determine memory property flags */
-    VkMemoryPropertyFlags memory_property_flags;
+    VkMemoryPropertyFlags memory_property_flags = 0;
 
     if (is_buffer_type_host(type)) {
         memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
