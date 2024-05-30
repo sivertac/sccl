@@ -148,19 +148,13 @@ count_descriptor_set_layouts(const sccl_shader_buffer_layout_t *buffer_layouts,
 static VkDescriptorType
 sccl_buffer_type_to_vk_descriptor_type(const sccl_buffer_type_t type)
 {
-    switch (type) {
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_shared_storage:
+    if (is_buffer_type_storage(type)) {
         return VK_DESCRIPTOR_TYPE_STORAGE_BUFFER;
-    case sccl_buffer_type_host_uniform:
-    case sccl_buffer_type_device_uniform:
-    case sccl_buffer_type_shared_uniform:
+    } else if (is_buffer_type_uniform(type)) {
         return VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-    default:
-        assert(false);
-        return 0;
     }
+    assert(0);
+    return VK_DESCRIPTOR_TYPE_MAX_ENUM;
 }
 
 static void

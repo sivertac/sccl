@@ -24,6 +24,9 @@ protected:
     sccl_instance_t instance;
     sccl_device_t device;
     sccl_stream_t stream;
+
+    void buffer_passthrough_test(sccl_buffer_type_t source_type,
+                                 sccl_buffer_type_t target_type);
 };
 
 static void
@@ -517,5 +520,138 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
         sccl_destroy_buffer(host_output_buffers[i]);
         sccl_destroy_buffer(device_input_buffers[i]);
         sccl_destroy_buffer(device_output_buffers[i]);
+    }
+}
+
+void shader_test::buffer_passthrough_test(sccl_buffer_type_t source_type,
+                                          sccl_buffer_type_t target_type)
+{
+    std::string shader_source =
+        read_test_shader("copy_buffer_shader.spv").value();
+
+    sccl_buffer_t staging_buffer;
+    sccl_buffer_t source_buffer;
+    sccl_buffer_t target_buffer;
+
+    const size_t element_count = 0x1000;
+    using Type = uint32_t;
+
+    const size_t staging_buffer_size = element_count * sizeof(Type);
+    const size_t source_buffer_size = element_count * sizeof(Type);
+    const size_t target_buffer_size = element_count * sizeof(Type);
+
+    /* external memory */
+    void *source_external_ptr = nullptr;
+    void *target_external_ptr = nullptr;
+
+    /* create buffers */
+    SCCL_TEST_ASSERT(sccl_create_buffer(
+        device, &staging_buffer, sccl_buffer_type_host, staging_buffer_size));
+
+    bool supported = false;
+    create_buffer_generic(device, &source_buffer, source_type,
+                          source_buffer_size, &source_external_ptr, &supported);
+    if (!supported) {
+        sccl_destroy_buffer(staging_buffer);
+        /* skip, this permutation is not supported on this device */
+        return;
+    }
+    create_buffer_generic(device, &target_buffer, target_type,
+                          target_buffer_size, &target_external_ptr, &supported);
+    if (!supported) {
+        sccl_destroy_buffer(source_buffer);
+        sccl_destroy_buffer(staging_buffer);
+        /* skip, this permutation is not supported on this device */
+        return;
+    }
+
+    sccl_shader_buffer_layout_t source_buffer_layout = {};
+    sccl_shader_buffer_binding_t source_buffer_binding = {};
+    sccl_set_buffer_layout_binding(source_buffer, 0, 0, &source_buffer_layout,
+                                   &source_buffer_binding);
+    sccl_shader_buffer_layout_t target_buffer_layout = {};
+    sccl_shader_buffer_binding_t target_buffer_binding = {};
+    sccl_set_buffer_layout_binding(target_buffer, 0, 1, &target_buffer_layout,
+                                   &target_buffer_binding);
+
+    /* init stageing buffer */
+    uint32_t *staging_data_ptr;
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(
+        staging_buffer, (void **)&staging_data_ptr, 0, staging_buffer_size));
+    for (size_t i = 0; i < element_count; ++i) {
+        staging_data_ptr[i] = i;
+    }
+    sccl_host_unmap_buffer(staging_buffer);
+
+    printf("source_buffer_type = %d\n", source_type);
+    printf("target_buffer_type = %d\n", target_type);
+
+    /* create shader */
+    sccl_shader_buffer_layout_t buffer_layouts[] = {source_buffer_layout,
+                                                    target_buffer_layout};
+    sccl_shader_config_t shader_config = {};
+    shader_config.shader_source_code = shader_source.data();
+    shader_config.shader_source_code_length = shader_source.size();
+    shader_config.buffer_layouts = buffer_layouts;
+    shader_config.buffer_layouts_count = 2;
+
+    sccl_shader_t shader;
+    SCCL_TEST_ASSERT(sccl_create_shader(device, &shader, &shader_config));
+
+    /* run */
+    sccl_shader_buffer_binding_t buffer_bindings[] = {source_buffer_binding,
+                                                      target_buffer_binding};
+    sccl_shader_run_params_t params = {};
+    params.group_count_x = element_count;
+    params.group_count_y = 1;
+    params.group_count_z = 1;
+    params.buffer_bindings = buffer_bindings;
+    params.buffer_bindings_count = 2;
+
+    SCCL_TEST_ASSERT(sccl_copy_buffer(stream, staging_buffer, 0, source_buffer,
+                                      0, staging_buffer_size));
+
+    SCCL_TEST_ASSERT(sccl_run_shader(stream, shader, &params));
+
+    SCCL_TEST_ASSERT(sccl_copy_buffer(stream, target_buffer, 0, staging_buffer,
+                                      0, target_buffer_size));
+
+    SCCL_TEST_ASSERT(sccl_dispatch_stream(stream));
+
+    SCCL_TEST_ASSERT(sccl_join_stream(stream));
+
+    /* verify output data in staging buffer */
+    SCCL_TEST_ASSERT(sccl_host_map_buffer(
+        staging_buffer, (void **)&staging_data_ptr, 0, staging_buffer_size));
+    for (size_t i = 0; i < element_count; ++i) {
+        EXPECT_EQ(staging_data_ptr[i], i / 2);
+    }
+    sccl_host_unmap_buffer(staging_buffer);
+
+    /* cleanup */
+    sccl_destroy_shader(shader);
+    sccl_destroy_buffer(target_buffer);
+    sccl_destroy_buffer(source_buffer);
+    sccl_destroy_buffer(staging_buffer);
+}
+
+TEST_F(shader_test, shader_passthrough_all_valid_buffer_permutations)
+{
+    for (sccl_buffer_type_t src_type :
+         {sccl_buffer_type_host_storage, sccl_buffer_type_device_storage,
+          sccl_buffer_type_shared_storage,
+          sccl_buffer_type_external_host_pointer_storage,
+          sccl_buffer_type_host_dmabuf_storage,
+          sccl_buffer_type_device_dmabuf_storage,
+          sccl_buffer_type_shared_dmabuf_storage}) {
+        for (sccl_buffer_type_t dst_type :
+             {sccl_buffer_type_host_storage, sccl_buffer_type_device_storage,
+              sccl_buffer_type_shared_storage,
+              sccl_buffer_type_external_host_pointer_storage,
+              sccl_buffer_type_host_dmabuf_storage,
+              sccl_buffer_type_device_dmabuf_storage,
+              sccl_buffer_type_shared_dmabuf_storage}) {
+            buffer_passthrough_test(src_type, dst_type);
+        }
     }
 }

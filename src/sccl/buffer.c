@@ -3,7 +3,6 @@
 #include "alloc.h"
 #include "device.h"
 #include "error.h"
-#include <stdbool.h>
 
 static sccl_error_t find_memory_type(VkPhysicalDevice physical_device,
                                      uint32_t type_filter,
@@ -25,44 +24,45 @@ static sccl_error_t find_memory_type(VkPhysicalDevice physical_device,
     return sccl_unsupported_error;
 }
 
-static bool is_buffer_type_storage(sccl_buffer_type_t type)
+static VkBufferUsageFlags get_buffer_usage_flags(sccl_buffer_type_t type)
 {
-    switch (type) {
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_shared_storage:
-        return true;
-    case sccl_buffer_type_host_uniform:
-    case sccl_buffer_type_device_uniform:
-    case sccl_buffer_type_shared_uniform:
-    default:
-        return false;
+    /* determine buffer usage flags */
+    VkBufferUsageFlags buffer_usage_flags = 0;
+
+    if (is_buffer_type_storage(type)) {
+        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+    } else if (is_buffer_type_uniform(type)) {
+        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+    } else {
+        assert(false);
     }
+    buffer_usage_flags |=
+        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+    return buffer_usage_flags;
 }
 
-static bool is_buffer_type_uniform(sccl_buffer_type_t type)
+static VkMemoryPropertyFlags get_memory_property_flags(sccl_buffer_type_t type)
 {
-    switch (type) {
-    case sccl_buffer_type_host_uniform:
-    case sccl_buffer_type_device_uniform:
-    case sccl_buffer_type_shared_uniform:
-        return true;
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_shared_storage:
-    default:
-        return false;
-    }
-}
+    /* determine memory property flags */
+    VkMemoryPropertyFlags memory_property_flags = 0;
 
-static bool is_buffer_type_external(sccl_buffer_type_t type)
-{
-    switch (type) {
-    case sccl_buffer_type_external:
-        return true;
-    default:
-        return false;
+    if (is_buffer_type_host(type)) {
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    } else if (is_buffer_type_device(type)) {
+        memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+    } else if (is_buffer_type_shared(type)) {
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    } else if (is_buffer_type_external(type)) {
+        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
+                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+    } else {
+        assert(false);
     }
+
+    return memory_property_flags;
 }
 
 static sccl_error_t
@@ -78,17 +78,21 @@ allocate_buffer_internal(const sccl_device_t device,
     return sccl_success;
 }
 
-static sccl_error_t create_buffer_internal(
-    const sccl_device_t device, struct sccl_buffer **buffer_internal,
-    sccl_buffer_type_t type, size_t size, VkBufferUsageFlags buffer_usage_flags,
-    VkMemoryPropertyFlags memory_property_flags, void *buffer_create_info_pnext,
-    void *memory_allocate_info_pnext)
+static sccl_error_t create_buffer_internal(const sccl_device_t device,
+                                           struct sccl_buffer **buffer_internal,
+                                           sccl_buffer_type_t type, size_t size,
+                                           void *buffer_create_info_pnext,
+                                           void *memory_allocate_info_pnext)
 {
     sccl_error_t error = sccl_success;
 
     CHECK_SCCL_ERROR_GOTO(
         allocate_buffer_internal(device, buffer_internal, type), error_return,
         error);
+
+    VkBufferUsageFlags buffer_usage_flags = get_buffer_usage_flags(type);
+    VkMemoryPropertyFlags memory_property_flags =
+        get_memory_property_flags(type);
 
     /* create buffer */
     VkBufferCreateInfo buffer_create_info = {0};
@@ -151,6 +155,135 @@ error_return:
     return error;
 }
 
+bool is_buffer_type_storage(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_shared_storage:
+    case sccl_buffer_type_external_host_pointer_storage:
+    case sccl_buffer_type_host_dmabuf_storage:
+    case sccl_buffer_type_device_dmabuf_storage:
+    case sccl_buffer_type_shared_dmabuf_storage:
+    case sccl_buffer_type_external_dmabuf_storage:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_uniform(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_uniform:
+    case sccl_buffer_type_device_uniform:
+    case sccl_buffer_type_shared_uniform:
+    case sccl_buffer_type_external_host_pointer_uniform:
+    case sccl_buffer_type_host_dmabuf_uniform:
+    case sccl_buffer_type_device_dmabuf_uniform:
+    case sccl_buffer_type_shared_dmabuf_uniform:
+    case sccl_buffer_type_external_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_host(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_host_uniform:
+    case sccl_buffer_type_host_dmabuf_storage:
+    case sccl_buffer_type_host_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_device(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_device_uniform:
+    case sccl_buffer_type_device_dmabuf_storage:
+    case sccl_buffer_type_device_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_shared(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_shared_storage:
+    case sccl_buffer_type_shared_uniform:
+    case sccl_buffer_type_shared_dmabuf_storage:
+    case sccl_buffer_type_shared_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_external(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_external_host_pointer_storage:
+    case sccl_buffer_type_external_host_pointer_uniform:
+    case sccl_buffer_type_external_dmabuf_storage:
+    case sccl_buffer_type_external_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_regular(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_storage:
+    case sccl_buffer_type_device_storage:
+    case sccl_buffer_type_shared_storage:
+    case sccl_buffer_type_host_uniform:
+    case sccl_buffer_type_device_uniform:
+    case sccl_buffer_type_shared_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_host_pointer(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_external_host_pointer_storage:
+    case sccl_buffer_type_external_host_pointer_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
+bool is_buffer_type_dmabuf(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_dmabuf_storage:
+    case sccl_buffer_type_device_dmabuf_storage:
+    case sccl_buffer_type_shared_dmabuf_storage:
+    case sccl_buffer_type_host_dmabuf_uniform:
+    case sccl_buffer_type_device_dmabuf_uniform:
+    case sccl_buffer_type_shared_dmabuf_uniform:
+    case sccl_buffer_type_external_dmabuf_storage:
+    case sccl_buffer_type_external_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
 sccl_error_t sccl_create_buffer(const sccl_device_t device,
                                 sccl_buffer_t *buffer, sccl_buffer_type_t type,
                                 size_t size)
@@ -158,45 +291,13 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
 
     struct sccl_buffer *buffer_internal = NULL;
 
-    /* determine buffer usage flags */
-    VkBufferUsageFlags buffer_usage_flags = 0;
-    /* check if buffer is storage or uniform */
-    if (is_buffer_type_storage(type)) {
-        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    } else if (is_buffer_type_uniform(type)) {
-        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    } else {
-        return sccl_invalid_argument;
-    }
-    buffer_usage_flags |=
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-    /* determine memory property flags */
-    VkMemoryPropertyFlags memory_property_flags;
-    switch (type) {
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_host_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        break;
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_device_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        break;
-    case sccl_buffer_type_shared_storage:
-    case sccl_buffer_type_shared_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        /* `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` makes shared buffer turbo slow
-         * to read back to CPU */
-        break;
-    default:
+    /* check buffer type is regular */
+    if (!is_buffer_type_regular(type)) {
         return sccl_invalid_argument;
     }
 
-    CHECK_SCCL_ERROR_RET(create_buffer_internal(
-        device, &buffer_internal, type, size, buffer_usage_flags,
-        memory_property_flags, NULL, NULL));
+    CHECK_SCCL_ERROR_RET(create_buffer_internal(device, &buffer_internal, type,
+                                                size, NULL, NULL));
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;
@@ -204,9 +305,9 @@ sccl_error_t sccl_create_buffer(const sccl_device_t device,
     return sccl_success;
 }
 
-sccl_error_t sccl_create_host_pointer_buffer(const sccl_device_t device,
-                                             sccl_buffer_t *buffer,
-                                             void *host_pointer, size_t size)
+sccl_error_t sccl_create_external_host_pointer_buffer(
+    const sccl_device_t device, sccl_buffer_t *buffer, sccl_buffer_type_t type,
+    void *host_pointer, size_t size)
 {
     struct sccl_buffer *buffer_internal = NULL;
 
@@ -215,16 +316,17 @@ sccl_error_t sccl_create_host_pointer_buffer(const sccl_device_t device,
         return sccl_unsupported_error;
     }
 
+    /* check type is host pointer */
+    if (!is_buffer_type_host_pointer(type)) {
+        return sccl_invalid_argument;
+    }
+
     /* create buffer for external memory */
     VkExternalMemoryBufferCreateInfo external_memory_buffer_create_info = {0};
     external_memory_buffer_create_info.sType =
         VK_STRUCTURE_TYPE_EXTERNAL_MEMORY_BUFFER_CREATE_INFO;
     external_memory_buffer_create_info.handleTypes =
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_HOST_ALLOCATION_BIT_EXT;
-
-    VkMemoryPropertyFlags memory_property_flags =
-        VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-        VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
     /* use host pointer ext */
     VkImportMemoryHostPointerInfoEXT import_memory_host_pointer_info = {0};
@@ -235,10 +337,8 @@ sccl_error_t sccl_create_host_pointer_buffer(const sccl_device_t device,
     import_memory_host_pointer_info.pHostPointer = host_pointer;
 
     CHECK_SCCL_ERROR_RET(create_buffer_internal(
-        device, &buffer_internal, sccl_buffer_type_external, size,
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
-        memory_property_flags, &external_memory_buffer_create_info,
-        &import_memory_host_pointer_info));
+        device, &buffer_internal, type, size,
+        &external_memory_buffer_create_info, &import_memory_host_pointer_info));
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;
@@ -257,39 +357,8 @@ sccl_error_t sccl_create_dmabuf_buffer(const sccl_device_t device,
         return sccl_unsupported_error;
     }
 
-    /* determine buffer usage flags */
-    VkBufferUsageFlags buffer_usage_flags = 0;
-    /* check if buffer is storage or uniform */
-    if (is_buffer_type_storage(type)) {
-        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    } else if (is_buffer_type_uniform(type)) {
-        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    } else {
-        return sccl_invalid_argument;
-    }
-    buffer_usage_flags |=
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-    /* determine memory property flags */
-    VkMemoryPropertyFlags memory_property_flags;
-    switch (type) {
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_host_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        break;
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_device_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        break;
-    case sccl_buffer_type_shared_storage:
-    case sccl_buffer_type_shared_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        /* `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` makes shared buffer turbo slow
-         * to read back to CPU */
-        break;
-    default:
+    /* check if type is dmabuf */
+    if (!is_buffer_type_dmabuf(type)) {
         return sccl_invalid_argument;
     }
 
@@ -306,8 +375,7 @@ sccl_error_t sccl_create_dmabuf_buffer(const sccl_device_t device,
         VK_EXTERNAL_MEMORY_HANDLE_TYPE_DMA_BUF_BIT_EXT;
 
     CHECK_SCCL_ERROR_RET(create_buffer_internal(
-        device, &buffer_internal, sccl_buffer_type_external, size,
-        buffer_usage_flags, memory_property_flags,
+        device, &buffer_internal, type, size,
         &external_memory_buffer_create_info, &export_memory_allocate_info));
 
     /* set public handle */
@@ -321,6 +389,11 @@ sccl_error_t sccl_export_dmabuf_buffer(const sccl_buffer_t buffer, int *out_fd)
     /* check if supported */
     if (!buffer->device->dmabuf_buffer_supported) {
         return sccl_unsupported_error;
+    }
+
+    /* check if type is dmabuf */
+    if (!is_buffer_type_dmabuf(buffer->type)) {
+        return sccl_invalid_argument;
     }
 
     VkMemoryGetFdInfoKHR memory_get_fd_info = {0};
@@ -345,6 +418,11 @@ sccl_error_t sccl_import_dmabuf_buffer(const sccl_device_t device,
         return sccl_unsupported_error;
     }
 
+    /* check if type is dmabuf */
+    if (!is_buffer_type_dmabuf(type)) {
+        return sccl_invalid_argument;
+    }
+
     /* query memory import info */
     VkMemoryFdPropertiesKHR memory_fd_properties = {0};
     memory_fd_properties.sType = VK_STRUCTURE_TYPE_MEMORY_FD_PROPERTIES_KHR;
@@ -353,42 +431,6 @@ sccl_error_t sccl_import_dmabuf_buffer(const sccl_device_t device,
         &memory_fd_properties));
     // printf("memory_fd_properties.memoryTypeBits = %d\n",
     // memory_fd_properties.memoryTypeBits);
-
-    /* determine buffer usage flags */
-    VkBufferUsageFlags buffer_usage_flags = 0;
-    /* check if buffer is storage or uniform */
-    if (is_buffer_type_storage(type)) {
-        buffer_usage_flags |= VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-    } else if (is_buffer_type_uniform(type)) {
-        buffer_usage_flags |= VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-    } else {
-        return sccl_invalid_argument;
-    }
-    buffer_usage_flags |=
-        VK_BUFFER_USAGE_TRANSFER_SRC_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-    /* determine memory property flags */
-    VkMemoryPropertyFlags memory_property_flags;
-    switch (type) {
-    case sccl_buffer_type_host_storage:
-    case sccl_buffer_type_host_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        break;
-    case sccl_buffer_type_device_storage:
-    case sccl_buffer_type_device_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-        break;
-    case sccl_buffer_type_shared_storage:
-    case sccl_buffer_type_shared_uniform:
-        memory_property_flags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT |
-                                VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-        /* `VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT` makes shared buffer turbo slow
-         * to read back to CPU */
-        break;
-    default:
-        return sccl_invalid_argument;
-    }
 
     /* create buffer for external memory */
     VkExternalMemoryBufferCreateInfo external_memory_buffer_create_info = {0};
@@ -405,9 +447,8 @@ sccl_error_t sccl_import_dmabuf_buffer(const sccl_device_t device,
     import_memory_fd_info.fd = in_fd;
 
     CHECK_SCCL_ERROR_RET(create_buffer_internal(
-        device, &buffer_internal, type, size, buffer_usage_flags,
-        memory_property_flags, &external_memory_buffer_create_info,
-        &import_memory_fd_info));
+        device, &buffer_internal, type, size,
+        &external_memory_buffer_create_info, &import_memory_fd_info));
 
     /* set public handle */
     *buffer = (sccl_buffer_t)buffer_internal;

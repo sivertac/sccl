@@ -17,6 +17,13 @@ FetchContent_Declare(
 FetchContent_MakeAvailable(googletest)
 include(GoogleTest)
 
+add_library(test_common ${CMAKE_CURRENT_SOURCE_DIR}/common.cpp)
+target_include_directories(test_common PUBLIC ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(test_common PUBLIC sccl)
+target_link_libraries(test_common PRIVATE gtest)
+target_compile_features(test_common PRIVATE cxx_std_20)
+target_compile_options(test_common PRIVATE -Wall -Wextra -Wswitch)
+
 function(create_test target)
     # parse arguments
     set(options "")
@@ -27,7 +34,7 @@ function(create_test target)
     # create test
     add_executable(${target} ${CREATE_TEST_SOURCES})
     target_link_libraries(${target} PUBLIC gtest_main)
-    target_link_libraries(${target} PRIVATE sccl)
+    target_link_libraries(${target} PRIVATE sccl test_common)
     target_compile_features(${target} PRIVATE cxx_std_20)
     target_compile_options(${target} PRIVATE -Wall -Wextra -Wswitch)
     if (CREATE_TEST_DEPENDS) # check if not empty
