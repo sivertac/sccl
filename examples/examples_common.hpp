@@ -24,7 +24,7 @@
     do {                                                                       \
         sccl_error_t UNWRAP_SCCL_ERROR_error = cmd;                            \
         if (UNWRAP_SCCL_ERROR_error != sccl_success) {                         \
-            fprintf(stderr, "SCCL error: %s\n",                                \
+            fprintf(stderr, "%s:%d SCCL error: %s\n", __FILE__, __LINE__,      \
                     sccl_get_error_string(UNWRAP_SCCL_ERROR_error));           \
             exit(EXIT_FAILURE);                                                \
         }                                                                      \
