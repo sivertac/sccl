@@ -45,3 +45,11 @@ target_link_libraries(compute_matrix_multiply PRIVATE examples_common)
 target_compile_features(compute_matrix_multiply PRIVATE cxx_std_20)
 target_compile_options(compute_matrix_multiply PRIVATE -Wall -Wextra -Wswitch)
 add_dependencies(compute_matrix_multiply compute_matrix_multiply_shader)
+
+add_executable(multi_gpu_dmabuf
+    ${CMAKE_CURRENT_SOURCE_DIR}/multi_gpu_dmabuf.cpp
+)
+target_include_directories(multi_gpu_dmabuf PRIVATE ${CMAKE_CURRENT_SOURCE_DIR})
+target_link_libraries(multi_gpu_dmabuf PRIVATE examples_common)
+target_compile_features(multi_gpu_dmabuf PRIVATE cxx_std_20)
+target_compile_options(multi_gpu_dmabuf PRIVATE -Wall -Wextra -Wswitch)
