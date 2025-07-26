@@ -11,7 +11,7 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 add_subdirectory(cmake)
 
 # clang-tidy
-set(CMAKE_CXX_CLANG_TIDY "clang-tidy-15;-config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
+set(CMAKE_CXX_CLANG_TIDY "clang-tidy-19;-config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
 
 add_compile_options(-Wuninitialized -Werror -Wall)
 #add_compile_options(-fsanitize=address -fno-omit-frame-pointer -g)
