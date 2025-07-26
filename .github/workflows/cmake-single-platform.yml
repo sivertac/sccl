@@ -36,5 +36,5 @@ jobs:
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: ctest -C ${{matrix.build_type}}
+      run: SCCL_TEST_PLATFORM_DOCKER=1 ctest -C ${{matrix.build_type}}
 

@@ -523,9 +523,34 @@ TEST_F(shader_test, shader_copy_buffer_concurrent_streams)
     }
 }
 
+static bool is_buffer_type_dmabuf(sccl_buffer_type_t type)
+{
+    switch (type) {
+    case sccl_buffer_type_host_dmabuf_storage:
+    case sccl_buffer_type_device_dmabuf_storage:
+    case sccl_buffer_type_shared_dmabuf_storage:
+    case sccl_buffer_type_host_dmabuf_uniform:
+    case sccl_buffer_type_device_dmabuf_uniform:
+    case sccl_buffer_type_shared_dmabuf_uniform:
+    case sccl_buffer_type_external_dmabuf_storage:
+    case sccl_buffer_type_external_dmabuf_uniform:
+        return true;
+    default:
+        return false;
+    }
+}
+
 void shader_test::buffer_passthrough_test(sccl_buffer_type_t source_type,
                                           sccl_buffer_type_t target_type)
 {
+
+    if (get_environment_platform_docker() &&
+        (is_buffer_type_dmabuf(source_type) ||
+         is_buffer_type_dmabuf(target_type))) {
+        /* skip, dmabuf does not work well inside docker containers */
+        return;
+    }
+
     std::string shader_source =
         read_test_shader("copy_buffer_shader.spv").value();
 
