@@ -9,13 +9,15 @@ Sivert Collective Compute Library (SCCL) is a wrapper library for simplifying wr
 * C17 compatible compiler
 * C++20 compatible compiler
 * Vulkan SDK https://vulkan.lunarg.com/
-* clang-tidy-15
+* clang-tidy-19
 
 ### Run tests
 Run this is build directory:
 ```
 make -j $(nproc) && SCCL_ENABLE_VALIDATION_LAYERS=1 SCCL_ASSERT_ON_VALIDATION_ERROR=1 SCCL_TEST_GPU_INDEX=0 make test_verbose  && cat test/Testing/Temporary/LastTest.log 
 ```
+
+`SCCL_TEST_PLATFORM_DOCKER=1` will disable dmabuf tests, this is useful for docker containers, as dmabuf does not work well inside containers.
 
 ## Pre-commit
 https://pre-commit.com/

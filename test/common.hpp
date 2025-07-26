@@ -37,6 +37,17 @@ inline const char *get_environment_shaders_dir()
     return str;
 }
 
+inline bool get_environment_platform_docker()
+{
+    const char *str = getenv("SCCL_TEST_PLATFORM_DOCKER");
+    if (str == NULL) {
+        return false;
+    }
+    int value = std::atoi(str);
+    printf("environment - SCCL_TEST_PLATFORM_DOCKER = %d\n", value);
+    return static_cast<bool>(value);
+}
+
 inline std::optional<std::string> read_file(const char *filepath)
 {
     printf("filepath = %s\n", filepath);

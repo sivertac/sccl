@@ -119,6 +119,12 @@ TEST_F(buffer_test, create_external_host_pointer_buffer)
 
 TEST_F(buffer_test, create_dmabuf_buffer)
 {
+    /* dmabuf does not work well inside docker containers atm */
+    if (get_environment_platform_docker()) {
+        GTEST_SKIP() << "Skipping test, dmabuf can't be tested inside a docker "
+                        "container";
+    }
+
     /* query import alignment requirement */
     sccl_device_properties_t device_properties = {};
     sccl_get_device_properties(device, &device_properties);
