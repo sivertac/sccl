@@ -2,6 +2,7 @@
 #include "examples_common.hpp"
 
 #include <binary_util.hpp>
+#include <cerrno>
 #include <iostream>
 
 void print_data_buffer(const sccl_buffer_t buffer, size_t size)
@@ -14,17 +15,25 @@ void print_data_buffer(const sccl_buffer_t buffer, size_t size)
     sccl_host_unmap_buffer(buffer);
 }
 
+// NOLINTBEGIN
 std::optional<std::string> read_file(const char *filepath)
 {
     // Read the shader code from the file
     FILE *file = fopen(filepath, "rb");
-    if (!file) {
+    if (file == NULL) {
         return std::nullopt;
     }
     fseek(file, 0, SEEK_END);
     size_t size = ftell(file);
+
     rewind(file);
+
     char *data = (char *)malloc(size);
+    if (data == nullptr) {
+        fclose(file);
+        return std::nullopt;
+    }
+
     size_t read_size = fread(data, 1, size, file);
     if (read_size < size) {
         free(data);
@@ -38,3 +47,4 @@ std::optional<std::string> read_file(const char *filepath)
 
     return ret;
 }
+// NOLINTEND

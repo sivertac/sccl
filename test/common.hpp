@@ -48,6 +48,7 @@ inline bool get_environment_platform_docker()
     return static_cast<bool>(value);
 }
 
+// NOLINTBEGIN
 inline std::optional<std::string> read_file(const char *filepath)
 {
     printf("filepath = %s\n", filepath);
@@ -73,6 +74,7 @@ inline std::optional<std::string> read_file(const char *filepath)
 
     return ret;
 }
+// NOLINTEND
 
 inline std::optional<std::string> read_test_shader(const char *shader_file_name)
 {
