@@ -5,7 +5,7 @@
 #include "common.hpp"
 #include <gtest/gtest.h>
 
-TEST(nccl_instance, create_instance)
+TEST(sccl_instance, create_instance)
 {
 
     sccl_instance_t instance;
