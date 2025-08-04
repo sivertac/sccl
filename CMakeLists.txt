@@ -9,6 +9,7 @@ find_program(glslc_executable NAMES glslc HINTS Vulkan::glslc)
 set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 add_subdirectory(cmake)
+add_subdirectory(poglang)
 
 # clang-tidy
 set(CMAKE_CXX_CLANG_TIDY "clang-tidy-19;-config-file=${CMAKE_CURRENT_SOURCE_DIR}/.clang-tidy")
